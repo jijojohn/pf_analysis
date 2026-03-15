@@ -1,0 +1,167 @@
+{
+  "system_settings": {
+    "portfolio_file": "dpsr_report.xls.xlsx",
+    "cache_directory": "price_cache",
+    "reports_directory": "reports",
+    "data_retention_years": 5,
+    "auto_update_data": true
+  },
+  "benchmark_settings": {
+    "primary_benchmark": "^NSEI",
+    "benchmark_name": "NIFTY 50",
+    "rs_benchmark_index": "^NSEI",
+    "rs_benchmark_name": "NIFTY 50",
+    "alternative_benchmarks": {
+      "nifty_500": "^CRSLDX",
+      "nifty_100": "^CNX100",
+      "sensex": "^BSESN",
+      "nifty_midcap": "^CNXMID",
+      "nifty_smallcap": "^CNXSC",
+      "nifty_microcap": "NIFTY_MICROCAP250.NS"
+    },
+    "rs_calculation_period": 90,
+    "rs_smoothing_period": 14
+  },
+  "technical_indicators": {
+    "moving_averages": {
+      "sma_periods": [20, 50, 200],
+      "ema_periods": [12, 26, 50],
+      "wema_periods": [21, 30],
+      "dsma_periods": [50, 200],
+      "dsma_displacement": {
+        "50": 10,
+        "200": 25
+      }
+    },
+    "momentum_indicators": {
+      "rsi": {
+        "period": 14,
+        "overbought_threshold": 70,
+        "oversold_threshold": 30
+      },
+      "macd": {
+        "fast_period": 12,
+        "slow_period": 26,
+        "signal_period": 9
+      },
+      "stochastic": {
+        "k_period": 14,
+        "d_period": 3,
+        "overbought_threshold": 80,
+        "oversold_threshold": 20
+      },
+      "williams_r": {
+        "period": 14,
+        "overbought_threshold": -20,
+        "oversold_threshold": -80
+      }
+    },
+    "volatility_indicators": {
+      "bollinger_bands": {
+        "period": 20,
+        "std_deviation": 2
+      },
+      "atr": {
+        "period": 14
+      }
+    },
+    "volume_indicators": {
+      "obv_smoothing": 10,
+      "ad_line_smoothing": 10
+    }
+  },
+  "risk_metrics": {
+    "volatility": {
+      "annualization_factor": 252,
+      "rolling_window": 30
+    },
+    "sharpe_ratio": {
+      "risk_free_rate": 0.06,
+      "annualization_factor": 252
+    },
+    "max_drawdown": {
+      "lookback_period": 252
+    }
+  },
+  "filter_thresholds": {
+    "relative_strength": {
+      "very_strong": 10.0,
+      "strong": 3.0,
+      "weak": -3.0,
+      "very_weak": -10.0
+    },
+    "52_week_performance": {
+      "high_change_thresholds": [-10, -20, -30],
+      "low_change_thresholds": [10, 20, 30]
+    },
+    "portfolio_performance": {
+      "profit_threshold": 0.05,
+      "loss_threshold": -0.05
+    },
+    "volume_filters": {
+      "relative_volume_threshold": 2.0,
+      "relative_volume_average_days": 20,
+      "week_volume_days": 5,
+      "month_volume_days": 21
+    },
+    "price_extension": {
+      "dma_200_extension_threshold": 30.0
+    }
+  },
+  "data_sources": {
+    "primary_source": "manual_data",
+    "backup_sources": ["alpha_vantage", "quandl"],
+    "update_frequency": "daily",
+    "market_hours": {
+      "start": "09:15",
+      "end": "15:30",
+      "timezone": "Asia/Kolkata"
+    }
+  },
+  "report_settings": {
+    "date_format": "%Y-%m-%d",
+    "currency_symbol": "\u20b9",
+    "decimal_places": 2,
+    "include_charts": true,
+    "chart_theme": "plotly_dark",
+    "table_style": "professional",
+    "retention_days": 1
+  },
+  "performance_settings": {
+    "cache_enabled": true,
+    "parallel_processing": false,
+    "parallel_report_generation": true,
+    "max_workers": 4,
+    "batch_size": 50,
+    "timeout_seconds": 30
+  },
+  "scoring_settings": {
+    "weights": {
+      "rs": 20,
+      "trend": 20,
+      "momentum": 20,
+      "risk": 20,
+      "value_volume": 20
+    }
+  },
+  "signal_settings": {
+    "strong_buy_threshold": 75,
+    "buy_threshold": 60,
+    "sell_threshold": 30,
+    "strong_sell_threshold": 15
+  },
+  "alert_settings": {
+    "rsi_overbought": 80,
+    "rsi_oversold": 25,
+    "ma_proximity_pct": 2.0,
+    "high_drawdown_pct": -30,
+    "volume_spike_threshold": 3.0
+  },
+  "logging": {
+    "level": "INFO",
+    "file_logging": true,
+    "log_directory": "logs",
+    "max_log_size_mb": 10,
+    "backup_count": 5
+  }
+}

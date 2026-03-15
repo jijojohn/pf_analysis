@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+
+# Cache
+price_cache/
+*.pkl
+*.xlsx
+
+# Generated reports (regenerated via run.sh)
+reports/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+*.log
+
+# Performance history (generated at runtime)
+performance_history.json
