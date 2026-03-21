@@ -758,7 +758,7 @@ class PortfolioDragAnalyzer:
             f.write(html_content)
         
         print(f"✅ Portfolio Drag Analysis Report saved: {filename}")
-        return html_content
+        return filename
 
 def generate_portfolio_drag_report(comprehensive_dataset: pd.DataFrame, historical_data: pd.DataFrame) -> str:
     """Generate the portfolio drag analysis report"""

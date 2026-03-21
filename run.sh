@@ -177,11 +177,16 @@ setup_venv() {
 # Check portfolio file (needed for data + report modes)
 # =============================================================================
 check_portfolio_file() {
-    if [ ! -f "dpsr_report.xls.xlsx" ]; then
-        print_error "Portfolio file dpsr_report.xls.xlsx not found!"
+    # Read portfolio filename from config.json (config-driven, not hardcoded)
+    PORTFOLIO_FILE=$($PYTHON -c "import json; print(json.load(open('config.json'))['system_settings']['portfolio_file'])" 2>/dev/null)
+    if [ -z "$PORTFOLIO_FILE" ]; then
+        PORTFOLIO_FILE="dpsr_report.xls.xlsx"
+    fi
+    if [ ! -f "$PORTFOLIO_FILE" ]; then
+        print_error "Portfolio file $PORTFOLIO_FILE not found!"
         exit 1
     fi
-    print_success "Portfolio file found"
+    print_success "Portfolio file found: $PORTFOLIO_FILE"
 }
 
 # =============================================================================

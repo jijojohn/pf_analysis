@@ -19,7 +19,11 @@ class ReportDocumentationGenerator:
         self.reports_dir = self.config.get_setting("system_settings.reports_directory", "reports")
         
     def generate_documentation(self) -> str:
-        """Generate complete documentation page"""
+        """Generate complete documentation page
+        
+        Returns:
+            str: Path to the saved documentation HTML file
+        """
         print("📚 Generating Report Documentation & Analysis Guide...")
         
         html_content = self.create_html_documentation()
@@ -33,7 +37,7 @@ class ReportDocumentationGenerator:
             f.write(html_content)
         
         print(f"✅ Report Documentation saved: {filename}")
-        return html_content
+        return filename
     
     def create_html_documentation(self) -> str:
         """Create comprehensive HTML documentation"""

@@ -432,7 +432,7 @@ class HTMLReportGenerator:
             f.write(html_content)
         
         print(f"✅ HTML report saved: {output_filename}")
-        return html_content
+        return output_filename
     
     def _get_html_header(self) -> str:
         """Get HTML header with shared dark-theme CSS"""

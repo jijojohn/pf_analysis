@@ -586,6 +586,13 @@ class TechnicalAnalyzer:
                     print(f"   ⚠️ No historical data for {symbol}")
                     continue
                 
+                # Drop rows where close is NaN (incomplete data from market-open fetches)
+                if 'close' in price_data.columns:
+                    price_data = price_data.dropna(subset=['close'])
+                    if len(price_data) == 0:
+                        print(f"   ⚠️ No valid close prices for {symbol} (all NaN)")
+                        continue
+                
                 # Current market data
                 current_price = price_data['close'].iloc[-1]
                 previous_close = price_data['close'].iloc[-2] if len(price_data) > 1 else current_price

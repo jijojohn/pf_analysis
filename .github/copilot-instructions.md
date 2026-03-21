@@ -61,7 +61,7 @@ run.sh → venv activation → verify_data_freshness.py → update_portfolio_dat
 | `report_documentation.py`    | Full guide to all reports, indicators, calculations                                                            |
 | `report_style.py`            | Shared dark-theme CSS, sortable-table JS, nav bar, "How It Works" helpers                                      |
 | `config_manager.py`          | Loads/manages `config.json` — all configurable thresholds and parameters                                       |
-| `data_fetcher.py`            | Yahoo Finance API with incremental .pkl caching in `price_cache/`                                              |
+| `data_fetcher.py`            | Yahoo Finance API with incremental delta .pkl caching in `price_cache/`; NaN close auto-cleanup                |
 | `update_portfolio_data.py`   | Standalone script to update portfolio + benchmark data                                                         |
 | `performance_bar_report.py`  | Horizontal period-return bar chart for all stocks (1W/1M/3M/6M/1Y)                                             |
 | `pf_manager.py`              | Loads portfolio from config-driven Excel file, normalizes columns                                              |
@@ -195,6 +195,49 @@ run.sh → venv activation → verify_data_freshness.py → update_portfolio_dat
 - `main_pf_app.py`: `analysis_results` is a reference (not `.copy()`); `gc.collect()` between pipeline steps; `del` + `gc.collect()` after drag_analyzer and optimizer; charts released after Step 6; parallel workers capped to max 2
 - `interactive_filter.py`: Removed duplicate `filtered_dataset` copy at init; `hist_data` uses non-mutating operations (`.rename()` returns new df, `.assign()` instead of column overwrite)
 - `pf_drag_analyzer.py` / `pf_optimizer.py`: `comprehensive_dataset` passed by reference (read-only); `historical_data.copy()` retained only where date columns are mutated
+
+## Implemented: Data fetching & delta update architecture
+
+### Data flow
+
+- **Portfolio symbols**: sourced exclusively from `config.json → system_settings.portfolio_file` Excel file
+- **Cache**: per-symbol pickle files in `price_cache/{SYMBOL}_data.pkl` — single source of truth
+- **Analysis pipeline** (`main_pf_app.py`): reads cache only — zero network calls during analysis
+- **Data update** (`update_portfolio_data.py`): fetches from Yahoo Finance API, writes to cache
+
+### Delta (incremental) data fetching
+
+- Default mode: fetches only missing data from 5 days before last cached date to today
+- `get_stock_data_smart(symbol, force_update=False)` — loads cache, determines missing range, fetches delta only
+- `get_stock_data_smart(symbol, force_update=True)` — fetches full 6-year historical data
+- **IST-aware freshness**: `_get_missing_date_range()` uses IST (`Asia/Kolkata`) to determine expected trading dates
+  - After 4 PM IST on weekdays: expects today's data
+  - Before 4 PM IST on weekdays: expects previous trading day's data
+  - Weekends: expects Friday's data (but if Saturday/Sunday data exists in cache, it's accepted)
+  - `_get_latest_expected_trading_date(now_ist)` returns the latest date for which data should exist
+  - Skips fetch entirely if `last_cached_date >= latest_expected` — no unnecessary API calls
+- NaN close prices (incomplete market-open data) are automatically dropped at every layer:
+  - `_yahoo_finance_fetch()`: drops NaN close rows before returning
+  - `_combine_historical_data()`: drops NaN close before merging
+  - `get_stock_data_smart()`: drops NaN close after loading from cache
+  - `DataManager._ensure_proper_index()`: drops NaN close when loading for analysis
+  - `technical_indicators.py`: drops NaN close per-symbol before calculating indicators
+
+### Symbol filtering requirements
+
+- Only symbols from `portfolio_file` are included in comprehensive dataset and reports
+- Symbols without cached data are skipped with a warning (not included in dataset)
+- Symbols with all-NaN close prices are skipped
+- Benchmark indices are fetched separately (`update_portfolio_data.py --benchmarks`)
+- Cache may contain non-portfolio symbols; they are ignored during analysis
+- `run.sh` reads portfolio filename from `config.json` (not hardcoded)
+
+### Report generators return conventions
+
+- All report `generate_report()` / `generate_documentation()` methods return the **filename** (not HTML content)
+- `pf_drag_analyzer.py`, `pf_optimizer.py`, `minervini_analyzer.py`, `report_documentation.py`, `html_report_generator.py` etc. all follow this pattern
+- Prevents accidental printing of HTML content to STDOUT
+- `main_pf_app.py` must NEVER print report return values in f-strings (they previously contained HTML)
 
 ## Output formatting
 

@@ -548,8 +548,8 @@ class PortfolioApp:
                 drag_analyzer = PortfolioDragAnalyzer(self.comprehensive_dataset, self.historical_data)
                 drag_report = drag_analyzer.generate_report()
                 if drag_report:
-                    print(f"✅ Portfolio drag analysis generated: {drag_report}")
-                del drag_analyzer
+                    print(f"✅ Portfolio drag analysis report generated")
+                del drag_analyzer, drag_report
                 gc.collect()
                 
                 # Portfolio Optimization Report
@@ -583,7 +583,7 @@ class PortfolioApp:
                 doc_generator = ReportDocumentationGenerator()
                 doc_report = doc_generator.generate_documentation()
                 if doc_report:
-                    print(f"✅ Documentation report generated: {doc_report}")
+                    print(f"✅ Documentation report generated")
                     
             except Exception as e:
                 print(f"❌ Error generating advanced reports: {e}")

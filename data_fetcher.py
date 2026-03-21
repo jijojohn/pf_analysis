@@ -24,6 +24,10 @@ def get_stock_data_smart(symbol: str, force_update: bool = False) -> pd.DataFram
     if not force_update:
         existing_data = _load_from_cache_with_fallback(symbol)
         if not existing_data.empty:
+            # Clean NaN close rows from cached data (incomplete market-open fetches)
+            if 'close' in existing_data.columns:
+                existing_data = existing_data.dropna(subset=['close'])
+            
             # Get the date range that needs to be updated
             missing_range = _get_missing_date_range(symbol, existing_data)
             
@@ -80,7 +84,12 @@ def get_stock_data_smart(symbol: str, force_update: bool = False) -> pd.DataFram
     return pd.DataFrame()
 
 def _get_missing_date_range(symbol: str, existing_data: pd.DataFrame) -> Optional[Tuple[date, date]]:
-    """Determine the date range that needs to be fetched for incremental updates"""
+    """Determine the date range that needs to be fetched for incremental updates.
+    
+    Uses IST (Asia/Kolkata) for date comparisons since this is Indian stock market data.
+    Dynamically checks the actual last data date against the latest expected trading day,
+    rather than assuming fixed weekend rules (handles Saturday trading sessions, holidays, etc.).
+    """
     if existing_data.empty:
         return None
     
@@ -97,20 +106,73 @@ def _get_missing_date_range(symbol: str, existing_data: pd.DataFrame) -> Optiona
         else:
             last_date = last_index
     
-    today = date.today()
+    # Use IST for Indian stock market
+    try:
+        from zoneinfo import ZoneInfo
+        ist = ZoneInfo('Asia/Kolkata')
+    except ImportError:
+        from datetime import timezone
+        ist = timezone(timedelta(hours=5, minutes=30))
+    
+    from datetime import datetime as dt
+    now_ist = dt.now(ist)
+    today_ist = now_ist.date()
+    
+    # Determine the latest expected trading date
+    # The market data for a day becomes available after market close (~3:30 PM IST)
+    # We consider data "expected" only after 4:00 PM IST to allow time for Yahoo to update
+    latest_expected = _get_latest_expected_trading_date(now_ist)
     
     # Check if data is already up to date
-    if last_date >= today:
-        print(f"✅ Data is already up to date (last date: {last_date})")
+    if last_date >= latest_expected:
         return None
     
-    # Calculate start date for missing data (5 days before last date to handle weekends/holidays)
-    # This ensures we don't miss any data due to gaps
+    # Calculate start date for missing data (5 days before last date to handle gaps)
     fetch_start_date = last_date - timedelta(days=5)
     
     # Fetch up to today
-    print(f"📅 Will fetch data from {fetch_start_date} to {today} (last cached: {last_date})")
-    return (fetch_start_date, today)
+    print(f"📅 Will fetch data from {fetch_start_date} to {today_ist} (last cached: {last_date}, expected: {latest_expected})")
+    return (fetch_start_date, today_ist)
+
+
+def _get_latest_expected_trading_date(now_ist) -> date:
+    """Determine the latest date for which we should expect market data.
+    
+    Logic:
+    - Before 4 PM IST on a weekday: expect previous trading day's data
+    - After 4 PM IST on a weekday: expect today's data
+    - On weekends: expect the most recent Friday's data (unless market had a special session)
+    - This is a best-effort heuristic; actual trading calendars may differ for holidays
+    
+    The function does NOT hardcode "no data on weekends" — it only determines
+    what the latest expected date is. If Saturday/Sunday data actually exists
+    in the cache, _get_missing_date_range will see last_date >= latest_expected
+    and correctly skip fetching.
+    """
+    today = now_ist.date()
+    weekday = today.weekday()  # 0=Monday, 6=Sunday
+    hour = now_ist.hour
+    
+    if weekday <= 4:  # Monday–Friday
+        if hour >= 16:  # After 4 PM: today's data should be available
+            return today
+        else:
+            # Before 4 PM: previous trading day
+            return _previous_weekday(today)
+    elif weekday == 5:  # Saturday
+        # Most recent expected data is Friday
+        return today - timedelta(days=1)
+    else:  # Sunday
+        # Most recent expected data is Friday
+        return today - timedelta(days=2)
+
+
+def _previous_weekday(d: date) -> date:
+    """Return the previous weekday (Mon-Fri) before date d."""
+    d = d - timedelta(days=1)
+    while d.weekday() > 4:  # Skip Saturday(5) and Sunday(6)
+        d = d - timedelta(days=1)
+    return d
 
 def _fetch_incremental_data(symbol: str, date_range: Tuple[date, date]) -> Optional[pd.DataFrame]:
     """Fetch data for a specific date range (incremental update)"""
@@ -180,6 +242,12 @@ def _combine_historical_data(existing_data: pd.DataFrame, new_data: pd.DataFrame
         existing_data['Symbol'] = symbol.split('.')[0]
     if 'Symbol' not in new_data.columns:
         new_data['Symbol'] = symbol.split('.')[0]
+    
+    # Drop rows with NaN close before combining (incomplete/market-open data)
+    if 'close' in existing_data.columns:
+        existing_data = existing_data.dropna(subset=['close'])
+    if 'close' in new_data.columns:
+        new_data = new_data.dropna(subset=['close'])
     
     # Combine dataframes
     combined_data_list = [existing_data, new_data]
@@ -324,6 +392,14 @@ def _yahoo_finance_fetch(symbol: str, start_date: str, end_date: str, interval: 
             df.drop(columns='close', inplace=True)
         if 'adjclose' in df.columns:
             df.rename(columns={'adjclose': 'close'}, inplace=True)
+            
+        # Drop rows where close price is NaN (incomplete data, e.g. market still open)
+        if 'close' in df.columns:
+            before_len = len(df)
+            df = df.dropna(subset=['close'])
+            dropped = before_len - len(df)
+            if dropped > 0:
+                print(f"   🧹 Dropped {dropped} row(s) with NaN close price for {symbol}")
             
         # Round to 2 decimal places
         df = df.round(2)
@@ -725,11 +801,14 @@ class DataManager:
             return pd.DataFrame()
     
     def _ensure_proper_index(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Ensure data has proper datetime index"""
+        """Ensure data has proper datetime index and clean NaN close rows"""
         if 'Date' in data.columns and not isinstance(data.index, pd.DatetimeIndex):
             data = data.set_index('Date')
         if not isinstance(data.index, pd.DatetimeIndex):
             data.index = pd.to_datetime(data.index)
+        # Drop rows where close is NaN (incomplete data from market-open fetches)
+        if 'close' in data.columns:
+            data = data.dropna(subset=['close'])
         return data.sort_index()
     
     def _get_alternative_symbol(self, symbol: str) -> str:
