@@ -14,10 +14,18 @@ from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from typing import Dict, List, Optional, Tuple
 
+def _base_symbol(symbol: str) -> str:
+    """Strip exchange suffix (.NS/.BO) from symbol for cache filenames.
+    E.g., 'RELIANCE.NS' -> 'RELIANCE', 'MODINSU.BO' -> 'MODINSU', 'NIFTY' -> 'NIFTY'"""
+    for suffix in ('.NS', '.BO'):
+        if symbol.endswith(suffix):
+            return symbol[:-len(suffix)]
+    return symbol
+
 def get_stock_data_smart(symbol: str, force_update: bool = False) -> pd.DataFrame:
     """Smart data fetcher with incremental updates and intelligent cache management"""
     
-    cache_filename = f"{symbol}_data.pkl"
+    cache_filename = f"{_base_symbol(symbol)}_data.pkl"
     cache_path = os.path.join('price_cache', cache_filename)
     
     # Step 1: Check for existing data and determine what needs to be fetched
@@ -39,6 +47,13 @@ def get_stock_data_smart(symbol: str, force_update: bool = False) -> pd.DataFram
                 # Fetch only missing data incrementally
                 print(f"� Fetching incremental data for {symbol} from {missing_range[0]} to {missing_range[1]}")
                 new_data = _fetch_incremental_data(symbol, missing_range)
+                
+                # If primary symbol fetch fails, try alternative exchange (NSE↔BSE)
+                if (new_data is None or new_data.empty):
+                    alt_symbol = _get_alternative_exchange_symbol(symbol)
+                    if alt_symbol and alt_symbol != symbol:
+                        print(f"🔄 Trying alternative exchange for incremental update: {symbol} → {alt_symbol}")
+                        new_data = _fetch_incremental_data(alt_symbol, missing_range)
                 
                 if new_data is not None and not new_data.empty:
                     # Combine existing and new data
@@ -437,7 +452,7 @@ def _convert_to_standard_format(df: pd.DataFrame) -> pd.DataFrame:
 
 def _get_cache_age(symbol: str) -> Optional[timedelta]:
     """Get the age of cached data for a symbol"""
-    cache_path = os.path.join('price_cache', f"{symbol}_data.pkl")
+    cache_path = os.path.join('price_cache', f"{_base_symbol(symbol)}_data.pkl")
     
     if os.path.exists(cache_path):
         try:
@@ -446,46 +461,22 @@ def _get_cache_age(symbol: str) -> Optional[timedelta]:
         except Exception:
             return None
     
-    # Try alternative exchange
-    alt_symbol = _get_alternative_exchange_symbol(symbol)
-    if alt_symbol and alt_symbol != symbol:
-        alt_cache_path = os.path.join('price_cache', f"{alt_symbol}_data.pkl")
-        if os.path.exists(alt_cache_path):
-            try:
-                file_mtime = datetime.fromtimestamp(os.path.getmtime(alt_cache_path))
-                return datetime.now() - file_mtime
-            except Exception:
-                return None
-    
     return None
 
 def _load_from_cache_with_fallback(symbol: str) -> pd.DataFrame:
-    """Load data from cache with automatic NSE/BSE fallback"""
+    """Load data from cache using base symbol (exchange-agnostic filename)"""
     cache_dir = 'price_cache'
+    base = _base_symbol(symbol)
+    cache_path = os.path.join(cache_dir, f"{base}_data.pkl")
     
-    # Try primary symbol first
-    primary_cache = os.path.join(cache_dir, f"{symbol}_data.pkl")
-    if os.path.exists(primary_cache):
+    if os.path.exists(cache_path):
         try:
-            data = pd.read_pickle(primary_cache)
+            data = pd.read_pickle(cache_path)
             if not data.empty:
-                print(f"� Loaded cached data from {symbol}_data.pkl")
+                print(f"\U0001f4c1 Loaded cached data from {base}_data.pkl")
                 return data
         except Exception as e:
-            print(f"⚠️ Error loading primary cache for {symbol}: {e}")
-    
-    # Try alternative exchange symbol
-    alt_symbol = _get_alternative_exchange_symbol(symbol)
-    if alt_symbol and alt_symbol != symbol:
-        alt_cache = os.path.join(cache_dir, f"{alt_symbol}_data.pkl")
-        if os.path.exists(alt_cache):
-            try:
-                data = pd.read_pickle(alt_cache)
-                if not data.empty:
-                    print(f"📁 Using alternative exchange data: {symbol} → {alt_symbol}")
-                    return data
-            except Exception as e:
-                print(f"⚠️ Error loading alternative cache for {alt_symbol}: {e}")
+            print(f"\u26a0\ufe0f Error loading cache for {symbol}: {e}")
     
     return pd.DataFrame()
 
@@ -545,7 +536,7 @@ class StreamlinedDataManager:
         missing_symbols = []
         
         for symbol in symbols:
-            cache_file = os.path.join(self.cache_dir, f"{symbol}_data.pkl")
+            cache_file = os.path.join(self.cache_dir, f"{_base_symbol(symbol)}_data.pkl")
             
             if not os.path.exists(cache_file):
                 missing_symbols.append(symbol)
@@ -575,7 +566,7 @@ class StreamlinedDataManager:
             try:
                 data = self._fetch_fresh_data(symbol)
                 if not data.empty:
-                    self.save_to_cache(data, f"{symbol}_data.pkl")
+                    self.save_to_cache(data, f"{_base_symbol(symbol)}_data.pkl")
                     updated_symbols.append(symbol)
                 else:
                     failed_symbols.append(symbol)
@@ -598,7 +589,7 @@ class StreamlinedDataManager:
             try:
                 data = self._fetch_fresh_data(symbol)
                 if not data.empty:
-                    self.save_to_cache(data, f"{symbol}_data.pkl")
+                    self.save_to_cache(data, f"{_base_symbol(symbol)}_data.pkl")
                     updated_symbols.append(symbol)
                     print(f"📈 Updated: {symbol}")
             except Exception as e:
@@ -616,8 +607,8 @@ class StreamlinedDataManager:
         if os.path.exists(self.cache_dir):
             for file in os.listdir(self.cache_dir):
                 if file.endswith('_data.pkl'):
-                    symbol = file.replace('_data.pkl', '')
-                    symbols.append(symbol)
+                    base = file.replace('_data.pkl', '')
+                    symbols.append(base)
         return symbols
         
     def _convert_nse_to_bse(self, symbol: str) -> str:
@@ -633,14 +624,6 @@ class StreamlinedDataManager:
             base_symbol = symbol.replace('.BO', '')
             return f"{base_symbol}.NS"
         return symbol
-        
-    def _get_alternative_symbol(self, symbol: str) -> Optional[str]:
-        """Get alternative exchange symbol for fallback"""
-        if symbol.endswith('.NS'):
-            return self._convert_nse_to_bse(symbol)
-        elif symbol.endswith('.BO'):
-            return self._convert_bse_to_nse(symbol)
-        return None
         
     def _get_alternative_symbol(self, symbol: str) -> Optional[str]:
         """Get alternative exchange symbol for fallback"""
@@ -699,9 +682,9 @@ class StreamlinedDataManager:
             print(f"❌ Failed to cache {filename}: {e}")
             
     def get_stock_data(self, symbol: str) -> pd.DataFrame:
-        """Get stock data for a symbol with exchange fallback - loads from cache if available"""
-        # Try primary symbol cache first
-        cache_file = os.path.join(self.cache_dir, f"{symbol}_data.pkl")
+        """Get stock data for a symbol - loads from cache using base symbol"""
+        base = _base_symbol(symbol)
+        cache_file = os.path.join(self.cache_dir, f"{base}_data.pkl")
         
         if os.path.exists(cache_file):
             try:
@@ -710,25 +693,12 @@ class StreamlinedDataManager:
                 if not data.empty:
                     return data
             except Exception as e:
-                print(f"⚠️ Error loading cached data for {symbol}: {e}")
-                
-        # Only check BSE cache if NSE cache not found and symbol is NSE
-        if symbol.endswith('.NS'):
-            alt_symbol = self._get_alternative_symbol(symbol)
-            alt_cache_file = os.path.join(self.cache_dir, f"{alt_symbol}_data.pkl")
-            if os.path.exists(alt_cache_file):
-                try:
-                    with open(alt_cache_file, 'rb') as f:
-                        data = pickle.load(f)
-                    if not data.empty:
-                        print(f"📊 Using BSE cached data: {symbol} → {alt_symbol}")
-                        return data
-                except Exception as e:
-                    print(f"⚠️ Error loading BSE cached data for {alt_symbol}: {e}")
+                print(f"\u26a0\ufe0f Error loading cached data for {symbol}: {e}")
                 
         # If no cache or error, return empty DataFrame
         return pd.DataFrame()
         
+
     def get_multiple_stocks_data(self, symbols: List[str]) -> pd.DataFrame:
         """Get data for multiple symbols and combine into one DataFrame"""
         combined_data = []
@@ -761,7 +731,7 @@ class DataManager:
         """Get stock data for a symbol - only loads from cache when force_update=False"""
         try:
             # Check if we have cached data
-            cache_filename = f"{symbol}_data.pkl"
+            cache_filename = f"{_base_symbol(symbol)}_data.pkl"
             cached_data = self.load_from_cache(cache_filename)
             
             # If force_update, always fetch fresh data (used by update_portfolio_data.py)
@@ -793,7 +763,7 @@ class DataManager:
         except Exception as e:
             print(f"❌ Error fetching data for {symbol}: {e}")
             # Try to use cached data as fallback
-            cache_filename = f"{symbol}_data.pkl"
+            cache_filename = f"{_base_symbol(symbol)}_data.pkl"
             cached_data = self.load_from_cache(cache_filename)
             if not cached_data.empty:
                 print(f"♻️  Using cached data as fallback for {symbol}")
@@ -897,7 +867,7 @@ class DataManager:
             print(f"📊 Added {len(missing_data)} new records for {symbol} (delta update)")
             
             # Save updated data to cache
-            cache_filename = f"{symbol}_data.pkl"
+            cache_filename = f"{_base_symbol(symbol)}_data.pkl"
             self.save_to_cache(combined_data, cache_filename)
             
             return combined_data

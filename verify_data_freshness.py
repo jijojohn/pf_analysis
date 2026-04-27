@@ -246,7 +246,9 @@ def verify_portfolio_symbols(portfolio_file=None, cache_dir='price_cache'):
             if not symbol.endswith('.NS') and not symbol.endswith('.BO'):
                 symbol = f"{symbol}.NS"
             
-            cache_file = os.path.join(cache_dir, f"{symbol}_data.pkl")
+            # Cache files use base symbol (no .NS/.BO suffix)
+            base_sym = symbol.split('.')[0] if '.' in str(symbol) else str(symbol)
+            cache_file = os.path.join(cache_dir, f"{base_sym}_data.pkl")
             
             if not os.path.exists(cache_file):
                 results.append([symbol, "NOT FOUND", "N/A", "N/A", "❌ MISSING", 0])
@@ -400,7 +402,8 @@ if __name__ == "__main__":
                     if not symbol.endswith('.NS') and not symbol.endswith('.BO'):
                         symbol = f"{symbol}.NS"
                     
-                    cache_file = os.path.join(cache_dir, f"{symbol}_data.pkl")
+                    base_sym = symbol.split('.')[0] if '.' in str(symbol) else str(symbol)
+                    cache_file = os.path.join(cache_dir, f"{base_sym}_data.pkl")
                     
                     if not os.path.exists(cache_file):
                         missing_count += 1
@@ -477,7 +480,8 @@ if __name__ == "__main__":
                 all_missing = 0
                 for sym in symbols:
                     s = sym if (str(sym).endswith('.NS') or str(sym).endswith('.BO')) else f"{sym}.NS"
-                    if not os.path.exists(os.path.join(cache_dir, f"{s}_data.pkl")):
+                    base_s = s.split('.')[0] if '.' in str(s) else str(s)
+                    if not os.path.exists(os.path.join(cache_dir, f"{base_s}_data.pkl")):
                         all_missing += 1
 
                 if all_missing > 0:

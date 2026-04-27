@@ -8,7 +8,7 @@ Can also update non-portfolio symbols (benchmarks, indices, watchlist)
 import pandas as pd
 import os
 import glob
-from data_fetcher import get_stock_data_smart
+from data_fetcher import get_stock_data_smart, _base_symbol
 from config_manager import get_config
 
 
@@ -183,7 +183,7 @@ def update_non_portfolio_data(portfolio_file=None, force_update=False):
         for cache_file in cache_files:
             # Extract symbol from filename
             filename = os.path.basename(cache_file)
-            symbol = filename.replace('_data.pkl', '')
+            symbol = filename.replace('_data.pkl', '')  # Already base symbol (no .NS/.BO)
             
             # Skip portfolio symbols
             if symbol not in portfolio_symbols:

@@ -12,58 +12,59 @@
   - `./run.sh --clean` — Delete all reports and regenerate from scratch
   - `./run.sh --help` — Show usage
 - Keep changes minimal and focused; avoid drive-by refactors unless explicitly requested.
-- Documentation-first: If docs are outdated or missing, update `README.md` and the generated `reports_documentation_YYYYMMDD.html` before or along with the change. (There is no `docs/architecture/` folder — all docs live in the root. `SYSTEM_DOCUMENTATION.md` was merged into `README.md` in v3.1.)
+- Documentation-first: If docs are outdated or missing, update `README.md` and the generated `reports_documentation_YYYYMMDD.html` before or along with the change. All docs live in the root.
 - Keep the `run.sh` workflow as the primary interface for running the system.
+- Always update `copilot-instructions.md` with any new feature or change.
 
 ## Architecture & module inventory
 
 ### Pipeline flow (orchestrated by `main_pf_app.py`)
 
 ```
-run.sh → venv activation → verify_data_freshness.py → update_portfolio_data.py → main_pf_app.py
+run.sh -> venv activation -> verify_data_freshness.py -> update_portfolio_data.py -> main_pf_app.py
   STEP 0: cleanup old reports
-  STEP 1: load portfolio (config.json → system_settings.portfolio_file via pf_manager.py)
+  STEP 1: load portfolio (config.json -> system_settings.portfolio_file via pf_manager.py)
   STEP 2: check data availability (price_cache/*.pkl via data_fetcher.py)
   STEP 3: generate comprehensive dataset (technical_indicators.py)
   STEP 4: Minervini stage analysis (minervini_analyzer.py) + composite scoring (stock_scorer.py) + signals (signal_engine.py)
   STEP 5: create Plotly visualizations
   STEP 6: main portfolio report (html_report_generator.py)
-  STEP 7: ~57 filtered reports (interactive_filter.py) — includes 6 Minervini + 4 HH/HL swing filters
+  STEP 7: ~57 filtered reports (interactive_filter.py) -- includes 6 Minervini + 4 HH/HL swing filters
   STEP 8: advanced reports
-     - pf_drag_analyzer.py → portfolio_drag_analysis_YYYYMMDD.html
-     - pf_optimizer.py → portfolio_optimization_report_YYYYMMDD.html
-     - minervini_analyzer.py → minervini_stage_analysis_YYYYMMDD.html
-     - performance_bar_report.py → performance_bar_chart_YYYYMMDD.html
-     - portfolio_health.py → portfolio_health_YYYYMMDD.html
-     - alert_engine.py → alert_conditions_YYYYMMDD.html
-     - performance_tracker.py → performance_trend_YYYYMMDD.html
-     - report_documentation.py → reports_documentation_YYYYMMDD.html
-  STEP 9: master index (master_report_generator.py → reports/index.html)
+     - pf_drag_analyzer.py -> portfolio_drag_analysis_YYYYMMDD.html
+     - pf_optimizer.py -> portfolio_optimization_report_YYYYMMDD.html
+     - minervini_analyzer.py -> minervini_stage_analysis_YYYYMMDD.html
+     - performance_bar_report.py -> performance_bar_chart_YYYYMMDD.html
+     - portfolio_health.py -> portfolio_health_YYYYMMDD.html
+     - alert_engine.py -> alert_conditions_YYYYMMDD.html
+     - performance_tracker.py -> performance_trend_YYYYMMDD.html
+     - report_documentation.py -> reports_documentation_YYYYMMDD.html
+  STEP 9: master index (master_report_generator.py -> reports/index.html)
 ```
 
 ### Key modules
 
 | Module                       | Purpose                                                                                                        |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `main_pf_app.py`             | Main orchestrator — 9-step pipeline                                                                            |
+| `main_pf_app.py`             | Main orchestrator -- 9-step pipeline                                                                           |
 | `technical_indicators.py`    | All technical indicator calculations; builds comprehensive dataset per stock                                   |
 | `html_report_generator.py`   | Main portfolio HTML report with Plotly charts                                                                  |
 | `interactive_filter.py`      | ~55+ filter criteria; generates per-filter HTML reports (MA, RS, volume, 52w, Minervini, HH/HL swing)          |
-| `stock_scorer.py`            | Composite scoring (0–100) across 5 categories: RS, Trend, Momentum (Minervini stage-based), Risk, Value/Volume |
-| `signal_engine.py`           | Strong Buy / Buy / Hold / Sell / Strong Sell signals — stage-aware (Buy requires Stage 1/2)                    |
+| `stock_scorer.py`            | Composite scoring (0-100) across 5 categories: RS, Trend, Momentum (Minervini stage-based), Risk, Value/Volume |
+| `signal_engine.py`           | Strong Buy / Buy / Hold / Sell / Strong Sell signals -- stage-aware (Buy requires Stage 1/2)                   |
 | `minervini_analyzer.py`      | 4-stage classification, 8-point Trend Template, stage analysis report                                          |
 | `pf_optimizer.py`            | Correlation, beta, stress-test, efficient-frontier-style optimization                                          |
 | `pf_drag_analyzer.py`        | Leave-one-out portfolio drag analysis, per-stock drawdown                                                      |
 | `portfolio_health.py`        | Traffic-light health dashboard, HHI concentration, momentum health                                             |
 | `alert_engine.py`            | Critical/Warning/Info alerts: MA crossovers, volume spikes, drawdowns                                          |
 | `performance_tracker.py`     | Persists metrics per run to `performance_history.json`; trend charts                                           |
-| `master_report_generator.py` | Generates `reports/index.html` — central dashboard linking all sub-reports                                     |
+| `master_report_generator.py` | Generates `reports/index.html` -- central dashboard with filter count badges                                   |
 | `report_documentation.py`    | Full guide to all reports, indicators, calculations                                                            |
 | `report_style.py`            | Shared dark-theme CSS, sortable-table JS, nav bar, "How It Works" helpers                                      |
-| `config_manager.py`          | Loads/manages `config.json` — all configurable thresholds and parameters                                       |
-| `data_fetcher.py`            | Yahoo Finance API with incremental delta .pkl caching in `price_cache/`; NaN close auto-cleanup                |
+| `config_manager.py`          | Loads/manages `config.json` -- all configurable thresholds and parameters                                      |
+| `data_fetcher.py`            | Yahoo Finance API with smart incremental caching, NSE/BSE fallback, NaN close cleanup                         |
 | `update_portfolio_data.py`   | Standalone script to update portfolio + benchmark data                                                         |
-| `performance_bar_report.py`  | Horizontal period-return bar chart for all stocks (1W/1M/3M/6M/1Y)                                             |
+| `performance_bar_report.py`  | Horizontal period-return bar chart for all stocks (1W/1M/3M/6M/1Y)                                            |
 | `pf_manager.py`              | Loads portfolio from config-driven Excel file, normalizes columns                                              |
 | `data_freshness_checker.py`  | Validates data freshness before analysis                                                                       |
 | `verify_data_freshness.py`   | CLI freshness check used by `run.sh`                                                                           |
@@ -73,16 +74,34 @@ run.sh → venv activation → verify_data_freshness.py → update_portfolio_dat
 
 - **Moving averages:** WEMA21 (Weekly EMA 21), WEMA30 (Weekly EMA 30), DSMA50, DSMA200, SMA50, SMA150, SMA200
 - **Internal only (not in dataset columns):** SMA20, EMA12, EMA26, EMA50, MACD, Bollinger Bands, Stochastic (Slow 14,3,3), ATR, Williams %R
-- **Note:** WEMA21/WEMA30 are proper EMA (exponential moving average, `adjust=False`) on daily close. DSMA50/DSMA200 are displaced (shifted) SMAs kept as reference columns. Filters and scoring use current SMA50/SMA200 (not displaced).
-- **TradingView alignment:** All indicators use TradingView-compatible formulas. RSI and ATR use Wilder's RMA (`ewm(alpha=1/period, adjust=False)`). EMA uses `adjust=False`. Stochastic is Slow (K smoothed by SMA3). Bollinger Bands use population std dev (`ddof=0`).
-- **Minervini:** Stage (1–4), Stage_Name, TT_Score (0–8), Stage_Action, SMA200_Slope
+- **Note:** WEMA21/WEMA30 are proper EMA (`ewm(span=period, adjust=False)`) on daily close. DSMA50/DSMA200 are displaced (shifted) SMAs kept as reference columns only. Filters and scoring use current SMA50/SMA200 (not displaced).
+- **Minervini:** Stage (1-4), Stage_Name, TT_Score (0-8), Stage_Action, SMA200_Slope
 - **52-week:** 52wH, 52wL, 52wHCh%, 52wLCh%
-- **Momentum:** RSI (14-period Wilder's RMA, reference only — NOT used in scoring), RS (vs NIFTY 50 benchmark)
+- **Momentum:** RSI (14-period Wilder's RMA, reference only -- NOT used in scoring or signals), RS (vs NIFTY 50 benchmark)
 - **Risk:** Sharpe Ratio, Sortino Ratio, Standard Deviation
 - **Volume:** OBV, A/D Line, Relative_Volume, Week/Month avg, Volume_Threshold_2x, Week_Threshold_Ratio
 - **Extension:** DMA200_Extension_Pct
 - **Period Returns:** 1W%, 1M%, 3M%, 6M%, 1Y% (trading-day lookback: 5/21/63/126/252)
 - **Swing Pattern:** HH (Higher High), HL (Higher Low), Swing_Trend (Bullish/Bearish/Weakening/Topping)
+
+#### TradingView-compatible formulas
+
+All indicators use TradingView-compatible formulas. Any future indicator additions MUST follow these conventions:
+
+| Indicator           | Formula                                                        |
+| ------------------- | -------------------------------------------------------------- |
+| **RSI / ATR**       | Wilder's RMA: `ewm(alpha=1/period, adjust=False).mean()`      |
+| **EMA**             | `ewm(span=period, adjust=False).mean()`                       |
+| **MACD**            | EMA(12) - EMA(26), signal = EMA(9) of MACD line               |
+| **Stochastic**      | Slow 14,3,3: raw %K smoothed by SMA(3), %D = SMA(3) of %K    |
+| **Bollinger Bands** | Population std dev (`ddof=0`)                                  |
+| **SMA**             | `rolling(window=period).mean()`                                |
+
+#### Display label conventions
+
+- Internal column names: `WEMA21`, `WEMA30`, `DSMA50`, `DSMA200`
+- User-facing display: "Weekly EMA 21", "Weekly EMA 30", "SMA 50", "SMA 200"
+- Table column headers use `col_display_names` mapping in filtered reports
 
 ### Report styling conventions
 
@@ -91,212 +110,130 @@ run.sh → venv activation → verify_data_freshness.py → update_portfolio_dat
 - Responsive design: `@media` breakpoints at 768px and 480px (mobile-friendly)
 - All reports have nav bar linking back to `reports/index.html`
 - Reports include "How This Report Works" collapsible section
-- Plotly charts use dark theme: `template='plotly_dark'`, `paper_bgcolor='#161b22'`, `plot_bgcolor='#0d1117'`, `font(color='#c9d1d9')`, `hovermode='closest'` with crosshair spikes, legend `bgcolor='rgba(22,27,34,0.9)'`
+- Plotly charts: `template='plotly_dark'`, `paper_bgcolor='#161b22'`, `plot_bgcolor='#0d1117'`, `font(color='#c9d1d9')`, `hovermode='closest'` with crosshair spikes (`showspikes=True, spikemode='across', spikesnap='cursor', spikethickness=1, spikedash='dot', spikecolor='#8b949e'`), legend `bgcolor='rgba(22,27,34,0.9)'`
+- All report `generate_report()` methods return the **filename** (not HTML content) -- `main_pf_app.py` must NEVER print return values in f-strings
 
 ## Project context
 
-- This is Stock Analysis System (SAS) for analyzing and reporting on stock data.
-- Do not use yfinance module for data fetching. Use the currently implemented data fetching module which uses Yahoo Finance API with incremental caching in `price_cache/` to ensure data freshness and minimize redundant API calls.
-- The system consists of data fetching, processing, and report generation components.
-- The main entry point is `main_pf_app.py` which orchestrates the workflow.
-- The system uses a Python virtual environment (`venv`) for dependency management.
-- The `run.sh` script is the primary interface for running the system, managing the venv, and ensuring proper execution order.
-- The system generates reports in the `reports/` directory, served locally via `./run.sh --serve`.
-- The master report entry point is `reports/index.html`, which links to all sub-reports.
-- The system is designed for extensibility, allowing for new data sources, processing steps, and report types to be added with minimal disruption to existing functionality.
-- The system emphasizes modularity, testability, and maintainability, with a focus on clear documentation and adherence to best practices.
-- The system is designed to handle large volumes of stock data efficiently, with optimizations for performance and scalability as needed.
-- The system includes comprehensive error handling and logging to facilitate debugging and ensure reliability.
-- The system provides actionable insights into stock performance, trends, and opportunities for investors and analysts, leveraging data-driven approaches and advanced analytics techniques.
-- This should provide early indication to exit a position if the stock is starting underperforming, or to take profits if the stock is overperforming, hold decisions. It can also help identify potential entry points (addition) based on technical indicators and market trends. Also rebalance the portfolio based on the performance of individual stocks and overall market conditions.
-- This should work mobile friendly, with responsive HTML reports that can be viewed on various devices.
-- This should be designed with security in mind, ensuring that any sensitive data (e.g. API keys, user information) is handled securely and not exposed in the codebase or reports.
-- This is primarily based on momentum indicators, technical analysis, and other relevant metrics to identify stocks that are performing well and have the potential for further growth.
-- Reporting should include actionable insights, key takeaways, such as potential entry and exit points for stocks. The system should provide clear recommendations for investors to take advantage of opportunities in the market while managing risk effectively.
-- Always update any new feature to documentation report html (`reports_documentation_YYYYMMDD.html`). Make sure to read that report first to understand existing header meanings, current calculations etc. Ensure it is up to date and clear for users.
-- Make sure all reports including filtered reports and hyperlinks are working from `index.html` to the report details page, and all the links in the report details page are working as well.
-- All reports tables must be sortable and headers frozen when scrolling, and the report details page should have a back-to-index link at the top. Try to avoid vertical scrolling — remove irrelevant columns per report context.
-- Inform user when the implementation ask and intention of this project is not aligned.
-- This is intended for **swing trading and long-term investment analysis**, not for day trading or high-frequency trading. The system focuses on analyzing stock performance over days, weeks, and months to identify trends and opportunities. It is not designed for real-time analysis or rapid decision-making required for day trading or high-frequency trading.
-- Always update `copilot-instructions.md` with any new feature or change, to ensure that the working agreements and project context are up to date.
+- **Stock Analysis System (SAS)** for **swing trading and long-term investment** -- not day trading or HFT.
+- Do NOT use `yfinance` module. Use the implemented `data_fetcher.py` which uses Yahoo Finance API with incremental caching.
+- Always update new features to documentation report (`reports_documentation_YYYYMMDD.html`). Read existing docs first.
+- All reports must have sortable tables, frozen headers, back-to-index link, working hyperlinks. Minimize vertical scrolling.
+- Reporting should include actionable insights: entry/exit points, hold decisions, rebalance recommendations.
+- Inform user when an implementation request is not aligned with this project's swing/long-term trading focus.
+- Security: Never expose API keys or sensitive data in codebase or reports.
 
-## Implemented: Mark Minervini stage analysis
+## Data fetching & smart update architecture
 
-- 4-stage stock cycle classification (Basing → Advancing → Topping → Declining)
+### Data flow overview
+
+- **Portfolio symbols**: sourced from `config.json -> system_settings.portfolio_file` Excel file (config-driven, not hardcoded)
+- **Cache**: per-symbol pickle files in `price_cache/{BASE_SYMBOL}_data.pkl` (exchange suffix stripped) -- single source of truth
+- **Analysis pipeline** (`main_pf_app.py`): reads cache only -- zero network calls during analysis
+- **Data update** (`update_portfolio_data.py`): calls `get_stock_data_smart()` per symbol, writes to cache
+
+### Smart data fetcher (`get_stock_data_smart()` in `data_fetcher.py`)
+
+The primary entry point for all data fetching. Implements a 4-step fallback strategy:
+
+1. **Cache lookup with exchange fallback** (`_load_from_cache_with_fallback`):
+   - Loads `{base_symbol}_data.pkl` from `price_cache/` (e.g., `RELIANCE_data.pkl` for `RELIANCE.NS`)
+   - Uses `_base_symbol()` to strip `.NS`/`.BO` suffix for filename lookup
+   - Cleans NaN close rows from cached data
+
+2. **Incremental (delta) fetch** -- if cache exists but is stale:
+   - `_get_missing_date_range()` determines what's missing using IST (`Asia/Kolkata`)
+   - Fetches only missing data from 5 days before last cached date to today
+   - **NSE/BSE fallback on incremental**: if primary symbol fetch fails/returns empty, automatically tries the alternative exchange symbol before giving up
+   - Combines new data with existing via `_combine_historical_data()` (deduplicates by date+symbol)
+   - Saves combined data back to cache under original symbol name
+
+3. **Full historical fetch** -- if no cache exists:
+   - `_fetch_full_historical_data()` fetches 6 years of daily OHLCV data
+   - If primary symbol returns no data, tries alternative exchange (Step 4)
+
+4. **Alternative exchange fallback** (`_get_alternative_exchange_symbol`):
+   - `.NS` (NSE) to `.BO` (BSE) automatic conversion and vice versa
+   - Symbols without suffix -> tries `.BO`
+   - Data is always saved under the **base symbol** cache filename (e.g., both `MODINSU.NS` and `MODINSU.BO` save to `MODINSU_data.pkl`)
+   - `_base_symbol()` strips `.NS`/`.BO`: `RELIANCE.NS` -> `RELIANCE`, `MODINSU.BO` -> `MODINSU`
+   - Example: `MODINSU.NS` not available on NSE -> dynamically switches to `MODINSU.BO` for data fetching, saves as `MODINSU_data.pkl`
+
+### IST-aware freshness logic
+
+- `_get_latest_expected_trading_date(now_ist)` determines the latest date for which market data should exist:
+  - After 4 PM IST on weekdays -> expects today's data
+  - Before 4 PM IST on weekdays -> expects previous trading day's data
+  - Weekends -> expects Friday's data (but accepts Saturday/Sunday data if it exists in cache)
+- Skips fetch entirely if `last_cached_date >= latest_expected` -- no unnecessary API calls
+
+### NaN close price cleanup
+
+NaN close rows (from incomplete market-open fetches) are dropped at every layer:
+- `_yahoo_finance_fetch()`: before returning raw data
+- `_combine_historical_data()`: before merging
+- `get_stock_data_smart()`: after loading from cache
+- `DataManager._ensure_proper_index()`: when loading for analysis
+- `technical_indicators.py`: per-symbol before calculating indicators
+
+### Yahoo Finance API details
+
+- Uses dynamic crumb/cookie authentication (`_get_yahoo_crumb_dynamic()`)
+- Falls back to hardcoded crumb if dynamic fetch fails after 2 attempts
+- 1-second rate limiting between requests
+- API endpoint: `query2.finance.yahoo.com/v8/finance/chart/{symbol}`
+- Uses `adjclose` as the `close` column (adjusted for splits/dividends)
+
+### Symbol handling conventions
+
+- `update_portfolio_data.py` appends `.NS` if symbol has no exchange suffix
+- Only symbols from `portfolio_file` are included in comprehensive dataset and reports
+- Symbols without cached data are skipped with a warning
+- Benchmark indices fetched separately (`update_portfolio_data.py --benchmarks`)
+- Cache may contain non-portfolio symbols; they are ignored during analysis
+- `run.sh` reads portfolio filename from `config.json`
+
+### Multiple data manager classes
+
+- `get_stock_data_smart()`: module-level function -- primary fetcher used by `update_portfolio_data.py`
+- `StreamlinedDataManager`: freshness checking, selective/full update orchestration
+- `DataManager`: used by analysis pipeline -- cache-only reads (no network), with BSE fallback for cache loading and force-update fetching
+
+## Feature reference
+
+### Minervini stage analysis
+
+- 4-stage stock cycle: Basing (1) -> Advancing (2) -> Topping (3) -> Declining (4)
 - 8-point Trend Template screening using SMA 50/150/200, 52wH/52wL, RS
-- Stage-based scoring REPLACES RSI in momentum category of Composite Scorer
-- RSI remains as a reference column but is NOT used in scoring or signal generation
+- Stage-based scoring in momentum category of Composite Scorer (replaces RSI in scoring)
 - Signal engine requires Stage 1/2 for Buy signals; Stage 3/4 generate bearish factors
 - Alert engine: Stage 4 = Critical, Stage 3 = Warning, Stage 2 TT7+ = Info
-- 6 new Minervini filters in interactive_filter.py (Stage 1/2/3/4, TT 6+, TT 7+)
-- Dedicated report: `minervini_stage_analysis_YYYYMMDD.html` with pie chart, stage tables
+- 6 Minervini filters in `interactive_filter.py` (Stage 1/2/3/4, TT 6+, TT 7+)
+- Dedicated report: `minervini_stage_analysis_YYYYMMDD.html`
 
-## Implemented: Higher High / Higher Low swing detection
+### Higher High / Higher Low swing detection
 
-- `_detect_hh_hl()` in technical_indicators.py using **5-bar pivot detection** (11-bar window) on **daily chart data**
-- Scans last 63 trading days (~3 months) for swing points
-- A swing high: bar whose high is the highest in ±5 bars (first occurrence wins on ties); swing low: bar whose low is the lowest in ±5 bars
+- `_detect_hh_hl()` in `technical_indicators.py`: **5-bar pivot detection** (11-bar window) on daily chart data
+- Scans last 63 trading days (~3 months); accepts pivot if bar is **first occurrence** of max/min in +/-5 bars (`np.argmax`/`np.argmin`)
 - HH = last pivot high > prior pivot high; HL = last pivot low > prior pivot low
-- 3 new dataset columns: HH (bool), HL (bool), Swing_Trend (Bullish/Bearish/Weakening/Topping)
-- 4 new swing filters in interactive_filter.py:
-  - Higher High & Higher Low (Bullish Swing)
-  - Higher Low Only (Accumulation)
-  - Lower Low (Bearish — Exit Signal)
-  - Higher High Only (Topping Risk)
-- Filter sub-page nav only links to non-empty filter reports (avoids broken links)
+- 4 swing filters: Bullish Swing (HH+HL), Accumulation (HL only), Bearish Exit (Lower Low), Topping Risk (HH only)
+- Filter sub-page nav only links to non-empty filter reports
 
-## Implemented: Performance Bar Chart report
+### RS (Relative Strength) calculation
 
-- `performance_bar_report.py` — horizontal green/red bars for 1W%, 1M%, 3M%, 6M%, 1Y% returns
-- Summary cards (gainers/losers/best/worst per period), average returns table
-- Quick-sort buttons per period, Stage/Signal/Swing_Trend columns
-- Wired into pipeline Step 8 and master_report_generator.py Analytics section
-
-## Implemented: Period return columns
-
-- `_calculate_period_returns()` in technical_indicators.py
-- 5 new columns: 1W%, 1M%, 3M%, 6M%, 1Y% (trading-day lookback)
-- Displayed in filtered reports, Minervini stage tables, performance bar chart
-
-## Implemented: Config-driven portfolio filename
-
-- Removed all 14 hardcoded `dpsr_report.xls.xlsx` references across 5 files
-- All modules now read from `config.json → system_settings.portfolio_file`
-- `_default_portfolio_file()` helper pattern in pf_manager, data_fetcher, update_portfolio_data, verify_data_freshness, main_pf_app
-
-## Implemented: Consolidated documentation
-
-- README.md is the single comprehensive document with architecture, modules, indicators, config
-
-## Implemented: Corrected RS (Relative Strength) calculation
-
-- RS is period-based: `stock_period_return - benchmark_period_return` (percentage-point scale, typical range -20 to +30)
-- Smoothing uses sliding sub-windows (not daily-return EMA which was 77× too small)
+- Period-based: `stock_period_return - benchmark_period_return` (percentage-point scale, typical range -20 to +30)
+- Smoothing: sliding sub-windows (not daily-return EMA)
 - Config keys: `rs_calculation_period: 90`, `rs_smoothing_period: 14`, `rs_benchmark_index: "^NSEI"`
-- RS filter thresholds rescaled: `very_strong: 10.0`, `strong: 3.0`, `weak: -3.0`, `very_weak: -10.0`
-- Scorer thresholds rescaled in `stock_scorer.py`: 5.0/7.0/10.0 (was 0.5/0.7/1.0)
-- Signal engine thresholds rescaled in `signal_engine.py`: 3.0/5.0 (was 0.3/0.5)
-- RSI remains reference-only column — NOT used in scoring or signals
+- Scorer thresholds: 5.0/7.0/10.0 | Signal thresholds: 3.0/5.0 | Filter thresholds: very_strong 10.0, strong 3.0, weak -3.0, very_weak -10.0
 
-## Implemented: Plotly chart improvements
+### Memory optimization
 
-- All charts use `hovermode='closest'` with crosshair spike lines (not `'x unified'` which showed all legend values)
-- Spike lines: `showspikes=True, spikemode='across', spikesnap='cursor', spikethickness=1, spikedash='dot', spikecolor='#8b949e'`
-- All charts use `plotly_dark` template (not `plotly_white`)
-- Legend: dark background `rgba(22,27,34,0.9)`, text `#c9d1d9` (was invisible white-on-white)
-- Applied across: `html_report_generator.py`, `interactive_filter.py`, `pf_drag_analyzer.py`, `pf_optimizer.py`
-
-## Implemented: Filter count badges in index.html
-
-- `master_report_generator.py` extracts stock count from each filtered report HTML (first 20KB, regex)
-- Displays pill-style badge (e.g., "12 stocks") next to each filter link in the Interactive Filter Reports section
-- Empty filters show "0 stocks" with muted styling
-
-## Implemented: Memory optimization for 1GB machines
-
-- `main_pf_app.py`: `analysis_results` is a reference (not `.copy()`); `gc.collect()` between pipeline steps; `del` + `gc.collect()` after drag_analyzer and optimizer; charts released after Step 6; parallel workers capped to max 2
-- `interactive_filter.py`: Removed duplicate `filtered_dataset` copy at init; `hist_data` uses non-mutating operations (`.rename()` returns new df, `.assign()` instead of column overwrite)
-- `pf_drag_analyzer.py` / `pf_optimizer.py`: `comprehensive_dataset` passed by reference (read-only); `historical_data.copy()` retained only where date columns are mutated
-
-## Implemented: Data fetching & delta update architecture
-
-### Data flow
-
-- **Portfolio symbols**: sourced exclusively from `config.json → system_settings.portfolio_file` Excel file
-- **Cache**: per-symbol pickle files in `price_cache/{SYMBOL}_data.pkl` — single source of truth
-- **Analysis pipeline** (`main_pf_app.py`): reads cache only — zero network calls during analysis
-- **Data update** (`update_portfolio_data.py`): fetches from Yahoo Finance API, writes to cache
-
-### Delta (incremental) data fetching
-
-- Default mode: fetches only missing data from 5 days before last cached date to today
-- `get_stock_data_smart(symbol, force_update=False)` — loads cache, determines missing range, fetches delta only
-- `get_stock_data_smart(symbol, force_update=True)` — fetches full 6-year historical data
-- **IST-aware freshness**: `_get_missing_date_range()` uses IST (`Asia/Kolkata`) to determine expected trading dates
-  - After 4 PM IST on weekdays: expects today's data
-  - Before 4 PM IST on weekdays: expects previous trading day's data
-  - Weekends: expects Friday's data (but if Saturday/Sunday data exists in cache, it's accepted)
-  - `_get_latest_expected_trading_date(now_ist)` returns the latest date for which data should exist
-  - Skips fetch entirely if `last_cached_date >= latest_expected` — no unnecessary API calls
-- NaN close prices (incomplete market-open data) are automatically dropped at every layer:
-  - `_yahoo_finance_fetch()`: drops NaN close rows before returning
-  - `_combine_historical_data()`: drops NaN close before merging
-  - `get_stock_data_smart()`: drops NaN close after loading from cache
-  - `DataManager._ensure_proper_index()`: drops NaN close when loading for analysis
-  - `technical_indicators.py`: drops NaN close per-symbol before calculating indicators
-
-### Symbol filtering requirements
-
-- Only symbols from `portfolio_file` are included in comprehensive dataset and reports
-- Symbols without cached data are skipped with a warning (not included in dataset)
-- Symbols with all-NaN close prices are skipped
-- Benchmark indices are fetched separately (`update_portfolio_data.py --benchmarks`)
-- Cache may contain non-portfolio symbols; they are ignored during analysis
-- `run.sh` reads portfolio filename from `config.json` (not hardcoded)
-
-### Report generators return conventions
-
-- All report `generate_report()` / `generate_documentation()` methods return the **filename** (not HTML content)
-- `pf_drag_analyzer.py`, `pf_optimizer.py`, `minervini_analyzer.py`, `report_documentation.py`, `html_report_generator.py` etc. all follow this pattern
-- Prevents accidental printing of HTML content to STDOUT
-- `main_pf_app.py` must NEVER print report return values in f-strings (they previously contained HTML)
+- `analysis_results` passed by reference (no `.copy()`); `gc.collect()` between pipeline steps
+- `interactive_filter.py`: non-mutating operations (`.rename()`, `.assign()`)
+- `pf_drag_analyzer.py` / `pf_optimizer.py`: `comprehensive_dataset` read-only; parallel workers capped to max 2
 
 ## Output formatting
 
 - For plans: Use a short checklist then the proposed diff summary.
 - For tests: Show commands you ran and the result summary.
 - For documentation: Show the updated sections with context.
-
-## Implemented: Moving average & swing detection corrections (v3.2)
-
-### WEMA calculation fix
-
-- Changed from WMA (linearly weighted: weights [1,2,...,n]) to proper **EMA** (`ewm(span=period, adjust=False)`)
-- Column names remain `WEMA21`/`WEMA30` internally; display labels changed to "Weekly EMA 21"/"Weekly EMA 30"
-- Affects: `technical_indicators.py`, all report labels, filter names, alert text, signal verdicts
-
-### DSMA filter correctness fix
-
-- Filters and scoring now compare CMP against **current SMA50/SMA200** (not displaced DSMA50/DSMA200)
-- DSMA columns remain in dataset as reference indicators; displacement causes stale values unsuitable for above/below filtering
-- Affects: `interactive_filter.py` (8 filter lambdas + "Above/Below All MAs"), `stock_scorer.py` (trend score), `signal_engine.py`, `alert_engine.py`, `portfolio_health.py`
-- Filter names renamed: "Stocks Below DSMA50" → "Stocks Below SMA 50", "Stocks Above DSMA200" → "Stocks Above SMA 200", etc.
-
-### HH/HL pivot detection fix
-
-- Removed overly strict uniqueness check `list(window).count(val) == 1` that skipped valid pivots when two bars shared the same high/low
-- New logic: accepts pivot if the bar is the **first occurrence** of the max/min in the ±5-bar window (`np.argmax`/`np.argmin`)
-- Detection still uses daily chart data (high/low), 63-day lookback, 5-bar pivot window
-
-### Display label changes
-
-- All user-facing text: "WEMA21" → "Weekly EMA 21", "WEMA30" → "Weekly EMA 30"
-- All user-facing text: "DSMA50" → "SMA 50", "DSMA200" → "SMA 200" (in filter names and guidance)
-- Table column headers in filtered reports show display names via `col_display_names` mapping
-- Updated across: `interactive_filter.py`, `alert_engine.py`, `signal_engine.py`, `portfolio_health.py`, `config_manager.py`
-
-## Implemented: TradingView-compatible indicator formulas (v3.3)
-
-### Indicators aligned to TradingView defaults
-
-All technical indicator calculations in `technical_indicators.py` now match TradingView's built-in indicator formulas:
-
-| Indicator           | Previous Method                  | TradingView Method                             | Change                                |
-| ------------------- | -------------------------------- | ---------------------------------------------- | ------------------------------------- |
-| **RSI**             | SMA-based (`rolling(14).mean()`) | Wilder's RMA (`ewm(alpha=1/14, adjust=False)`) | Less extreme values, better smoothing |
-| **EMA**             | `ewm(span, adjust=True)`         | `ewm(span, adjust=False)`                      | Standard recursive EMA                |
-| **MACD**            | adjust=True EMAs                 | adjust=False EMAs (via EMA fix)                | Consistent with TradingView           |
-| **ATR**             | SMA-based (`rolling(14).mean()`) | Wilder's RMA (`ewm(alpha=1/14, adjust=False)`) | Smoother volatility measure           |
-| **Stochastic**      | Fast (%K raw, %D=SMA3)           | Slow (%K=SMA3 of rawK, %D=SMA3 of %K)          | Default 14,3,3 like TradingView       |
-| **Bollinger Bands** | Sample std (`ddof=1`)            | Population std (`ddof=0`)                      | Matches TradingView exactly           |
-| **SMA**             | `rolling().mean()`               | Same                                           | No change needed                      |
-| **Williams %R**     | Standard                         | Standard                                       | No change needed                      |
-| **OBV**             | Standard                         | Standard                                       | No change needed                      |
-
-### Key formula references
-
-- **Wilder's RMA** (used by RSI, ATR): `ewm(alpha=1/period, adjust=False).mean()` — equivalent to TradingView's `ta.rma()`
-- **EMA**: `ewm(span=period, adjust=False).mean()` — equivalent to TradingView's `ta.ema()`
-- **SMA**: `rolling(window=period).mean()` — equivalent to TradingView's `ta.sma()`
-- **Slow Stochastic**: raw %K smoothed by SMA(3), then %D = SMA(3) of smoothed %K
-- Any future indicator additions MUST use TradingView-compatible formulas

@@ -134,10 +134,10 @@ class PortfolioApp:
         
         missing_symbols = []
         for symbol in symbols:
-            symbol_ns = f"{symbol}.NS" if not symbol.endswith(('.NS', '.BO')) else symbol
-            symbol_bo = symbol_ns.replace('.NS', '.BO')
+            # Cache files use base symbol (no .NS/.BO suffix)
+            base = symbol.split('.')[0] if '.' in str(symbol) else str(symbol)
             
-            if symbol_ns not in cached_symbols and symbol_bo not in cached_symbols:
+            if base not in cached_symbols:
                 missing_symbols.append(symbol)
         
         if missing_symbols:
