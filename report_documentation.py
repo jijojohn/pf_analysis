@@ -392,7 +392,7 @@ class ReportDocumentationGenerator:
             <div class="benefits-list">
                 <ul>
                     <li><strong>Relative Strength (20 pts):</strong> RS value vs benchmark + rank within portfolio</li>
-                    <li><strong>Trend (20 pts):</strong> CMP position relative to WEMA21, WEMA30, DSMA50, DSMA200</li>
+                    <li><strong>Trend (20 pts):</strong> CMP position relative to Weekly EMA 21, Weekly EMA 30, SMA 50, SMA 200</li>
                     <li><strong>Momentum (20 pts):</strong> Minervini Stage classification + Trend Template score + daily change</li>
                     <li><strong>Risk (20 pts):</strong> Sharpe Ratio, Sortino Ratio, low volatility</li>
                     <li><strong>Value/Volume (20 pts):</strong> 52-week position, DMA extension, relative volume</li>
@@ -402,7 +402,7 @@ class ReportDocumentationGenerator:
             <h4>📊 Signal Logic</h4>
             <div class="logic-section">
                 <div class="formula">
-                    Strong Buy: Score ≥ 75 AND RS > 0 AND above WEMA21 AND Sharpe > 0.5<br>
+                    Strong Buy: Score ≥ 75 AND RS > 0 AND above Weekly EMA 21 AND Sharpe > 0.5<br>
                     Buy: Score ≥ 60 AND Stage 1 or 2 AND (RS > 0 OR TT ≥ 4)<br>
                     Sell: Score < 40<br>
                     Strong Sell: Score < 25 AND Sharpe < 0 AND below all MAs<br>
@@ -469,7 +469,7 @@ class ReportDocumentationGenerator:
             <h4>📊 Metrics Tracked</h4>
             <ul>
                 <li><strong>Concentration Risk:</strong> Herfindahl-Hirschman Index (HHI), top-3 allocation %</li>
-                <li><strong>Momentum Health:</strong> % above WEMA21, % above DSMA200, % with positive RS</li>
+                <li><strong>Momentum Health:</strong> % above Weekly EMA 21, % above SMA 200, % with positive RS</li>
                 <li><strong>Risk Alerts:</strong> Stocks with negative Sharpe, high drawdown, average Sortino</li>
             </ul>
         </div>
@@ -484,7 +484,7 @@ class ReportDocumentationGenerator:
                     <li><strong>Stage 4 — Declining (Critical):</strong> Bearish MA stack, downtrend confirmed. Exit immediately</li>
                     <li><strong>Stage 3 — Topping (Warning):</strong> Distribution phase, MAs converging. Take profits</li>
                     <li><strong>Stage 2 — Prime Uptrend (Info):</strong> Full Trend Template (7+/8). Strong buy setup</li>
-                    <li><strong>MA Crossovers:</strong> CMP within 2% of WEMA21 or DSMA200</li>
+                    <li><strong>MA Crossovers:</strong> CMP within 2% of Weekly EMA 21 or SMA 200</li>
                     <li><strong>High Drawdown:</strong> 52wHCh% < -30%</li>
                     <li><strong>Volume Spikes:</strong> Relative Volume ≥ 3x average</li>
                     <li><strong>Risk Deterioration:</strong> Both Sharpe and Sortino negative</li>
@@ -585,14 +585,14 @@ class ReportDocumentationGenerator:
                         <td>Intraday momentum indicator</td>
                     </tr>
                     <tr>
-                        <td><strong>WEMA21</strong></td>
-                        <td>21-period Weighted EMA</td>
+                        <td><strong>Weekly EMA 21</strong></td>
+                        <td>21-period Exponential Moving Average</td>
                         <td>₹120.00</td>
                         <td>Short-term trend level</td>
                     </tr>
                     <tr>
-                        <td><strong>WEMA30</strong></td>
-                        <td>30-period Weighted EMA</td>
+                        <td><strong>Weekly EMA 30</strong></td>
+                        <td>30-period Exponential Moving Average</td>
                         <td>₹118.50</td>
                         <td>Medium-term trend level</td>
                     </tr>
@@ -616,15 +616,15 @@ class ReportDocumentationGenerator:
                     </tr>
                     <tr>
                         <td><strong>DSMA50</strong></td>
-                        <td>50-day Displaced SMA</td>
+                        <td>50-day Displaced SMA (reference only)</td>
                         <td>₹122.00</td>
-                        <td>Intermediate support/resistance</td>
+                        <td>Shifted SMA — filters use current SMA 50 instead</td>
                     </tr>
                     <tr>
                         <td><strong>DSMA200</strong></td>
-                        <td>200-day Displaced SMA</td>
+                        <td>200-day Displaced SMA (reference only)</td>
                         <td>₹110.00</td>
-                        <td>Long-term trend baseline</td>
+                        <td>Shifted SMA — filters use current SMA 200 instead</td>
                     </tr>
                     <tr>
                         <td><strong>RSI</strong></td>
@@ -802,39 +802,41 @@ class ReportDocumentationGenerator:
         <h3>📈 Moving Average Filters</h3>
         
         <div class="report-card">
-            <div class="report-title">WEMA (Weighted Exponential Moving Average)</div>
+            <div class="report-title">Weekly EMA (Exponential Moving Average)</div>
             <h4>Available Filters:</h4>
             <ul>
-                <li><strong>Above/Below WEMA21:</strong> Short-term trend direction</li>
-                <li><strong>Above/Below WEMA30:</strong> Medium-term trend direction</li>
-                <li><strong>Bullish Trend:</strong> Above both WEMA21 & WEMA30</li>
-                <li><strong>Bearish Trend:</strong> Below both WEMA21 & WEMA30</li>
+                <li><strong>Above/Below Weekly EMA 21:</strong> Short-term trend direction</li>
+                <li><strong>Above/Below Weekly EMA 30:</strong> Medium-term trend direction</li>
+                <li><strong>Bullish Trend:</strong> Above both Weekly EMA 21 & Weekly EMA 30</li>
+                <li><strong>Bearish Trend:</strong> Below both Weekly EMA 21 & Weekly EMA 30</li>
             </ul>
             
             <div class="logic-section">
-                <strong>WEMA Calculation:</strong>
+                <strong>EMA Calculation:</strong>
                 <div class="formula">
-                    WEMA = Σ(Price_i * Weight_i) / Σ(Weight_i)
-                    Weight_i = i (where i = 1, 2, 3, ..., period)
+                    EMA = Price_today × k + EMA_yesterday × (1 − k)
+                    k = 2 / (period + 1)
                 </div>
+                <p>Exponential smoothing gives more weight to recent prices than older prices.</p>
             </div>
         </div>
         
         <div class="report-card">
-            <div class="report-title">DSMA (Displaced Simple Moving Average)</div>
+            <div class="report-title">SMA 50 / SMA 200 Filters</div>
             <h4>Available Filters:</h4>
             <ul>
-                <li><strong>Above/Below DSMA50:</strong> Medium-term trend with 10-day displacement</li>
-                <li><strong>Above/Below DSMA200:</strong> Long-term trend with 25-day displacement</li>
+                <li><strong>Above/Below SMA 50:</strong> Medium-term trend (current 50-day SMA)</li>
+                <li><strong>Above/Below SMA 200:</strong> Long-term trend (current 200-day SMA)</li>
             </ul>
             
             <div class="logic-section">
-                <strong>DSMA Calculation:</strong>
+                <strong>Note:</strong>
+                <p>Filters compare CMP against current (non-displaced) SMA values for accurate above/below determination. DSMA columns remain in the dataset as reference indicators but are not used for filtering.</p>
+                <strong>DSMA Calculation (reference):</strong>
                 <div class="formula">
                     DSMA50 = SMA50 shifted forward by 10 days
                     DSMA200 = SMA200 shifted forward by 25 days
                 </div>
-                <p>Displacement helps reduce lag and provide earlier signals</p>
             </div>
         </div>
         
@@ -1023,10 +1025,10 @@ class ReportDocumentationGenerator:
             <div class="report-title">Multi-Criteria Filters</div>
             <h4>Available Filters:</h4>
             <ul>
-                <li><strong>Above All Moving Averages:</strong> Strong uptrend (CMP > WEMA21, WEMA30, DSMA50, DSMA200)</li>
+                <li><strong>Above All Moving Averages:</strong> Strong uptrend (CMP > Weekly EMA 21, Weekly EMA 30, SMA 50, SMA 200)</li>
                 <li><strong>Below All Moving Averages:</strong> Strong downtrend (CMP < all MAs)</li>
-                <li><strong>Bullish Trend:</strong> Above WEMA21 & WEMA30</li>
-                <li><strong>Bearish Trend:</strong> Below WEMA21 & WEMA30</li>
+                <li><strong>Bullish Trend:</strong> Above Weekly EMA 21 & Weekly EMA 30</li>
+                <li><strong>Bearish Trend:</strong> Below Weekly EMA 21 & Weekly EMA 30</li>
             </ul>
             
             <h4>📊 Strategy:</h4>

@@ -89,7 +89,7 @@ class AlertEngine:
         rs = row.get('RS', 0)
         cmp = row.get('CMP', 0)
         wema21 = row.get('WEMA21', cmp)
-        dsma200 = row.get('DSMA200', cmp)
+        dsma200 = row.get('SMA200', cmp)  # Use current SMA200, not displaced
         h52_chg = row.get('52wHCh%', 0)
         l52_chg = row.get('52wLCh%', 0)
         rel_vol = row.get('Relative_Volume', 0)
@@ -119,16 +119,16 @@ class AlertEngine:
             gap_pct = abs(cmp - wema21) / wema21 * 100
             if gap_pct <= self.ma_proximity_pct:
                 direction = "crossing above" if cmp > wema21 else "crossing below"
-                alerts.append(self._alert(sym, self.SEVERITY_INFO, "WEMA21 Crossover",
-                    f"CMP ₹{cmp:.0f} is {direction} WEMA21 (₹{wema21:.0f}), gap {gap_pct:.1f}%.",
-                    f"Price within {self.ma_proximity_pct}% of WEMA21, potential trend change."))
+                alerts.append(self._alert(sym, self.SEVERITY_INFO, "Weekly EMA 21 Crossover",
+                    f"CMP ₹{cmp:.0f} is {direction} Weekly EMA 21 (₹{wema21:.0f}), gap {gap_pct:.1f}%.",
+                    f"Price within {self.ma_proximity_pct}% of Weekly EMA 21, potential trend change."))
 
         if cmp > 0 and dsma200 > 0:
             gap_pct = abs(cmp - dsma200) / dsma200 * 100
             if gap_pct <= self.ma_proximity_pct:
                 direction = "crossing above" if cmp > dsma200 else "crossing below"
-                alerts.append(self._alert(sym, self.SEVERITY_WARNING, "DSMA200 Crossover",
-                    f"CMP ₹{cmp:.0f} is {direction} DSMA200 (₹{dsma200:.0f}), gap {gap_pct:.1f}%.",
+                alerts.append(self._alert(sym, self.SEVERITY_WARNING, "SMA 200 Crossover",
+                    f"CMP ₹{cmp:.0f} is {direction} SMA 200 (₹{dsma200:.0f}), gap {gap_pct:.1f}%.",
                     f"Price within {self.ma_proximity_pct}% of 200-day MA, significant trend signal."))
 
         # High drawdown
@@ -158,7 +158,7 @@ class AlertEngine:
         # Profit protection
         if pl_pct > self.profit_protect_pct and rsi > 65 and cmp < wema21:
             alerts.append(self._alert(sym, self.SEVERITY_WARNING, "Profit Protection",
-                f"Profit {pl_pct:.0f}% at risk — RSI {rsi:.0f} declining, below WEMA21.",
+                f"Profit {pl_pct:.0f}% at risk — RSI {rsi:.0f} declining, below Weekly EMA 21.",
                 f"Stock has >{self.profit_protect_pct}% profit but momentum is fading."))
 
         return alerts
@@ -198,7 +198,7 @@ class AlertEngine:
         nav = get_nav_bar('Alert Conditions')
         how_it_works = get_how_it_works('How Alerts Are Generated', [
             ('RSI Extremes', f'Overbought > {self.rsi_severe_ob}, Oversold < {self.rsi_severe_os} — momentum warning signals'),
-            ('MA Crossovers', f'Price within {self.ma_proximity_pct}% of WEMA21 or DSMA200 — potential trend change'),
+            ('MA Crossovers', f'Price within {self.ma_proximity_pct}% of Weekly EMA 21 or SMA 200 — potential trend change'),
             ('High Drawdown', f'52wHCh% < {self.drawdown_threshold}% — severe decline from 52-week high'),
             ('Volume Spikes', f'Relative volume >= {self.volume_spike}x average — unusual activity detected'),
             ('Risk Deterioration', 'Both Sharpe & Sortino negative — poor risk-adjusted returns'),

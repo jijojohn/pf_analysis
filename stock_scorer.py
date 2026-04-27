@@ -118,10 +118,10 @@ class StockScorer:
 
         score = 0.0
         ma_checks = [
-            ('WEMA21', 4),   # 4 points for above WEMA21
-            ('WEMA30', 4),   # 4 points for above WEMA30
-            ('DSMA50', 4),   # 4 points for above DSMA50
-            ('DSMA200', 4),  # 4 points for above DSMA200
+            ('WEMA21', 4),   # 4 points for above Weekly EMA 21
+            ('WEMA30', 4),   # 4 points for above Weekly EMA 30
+            ('SMA50', 4),    # 4 points for above SMA 50 (current, not displaced)
+            ('SMA200', 4),   # 4 points for above SMA 200 (current, not displaced)
         ]
 
         for ma_col, points in ma_checks:
@@ -134,7 +134,7 @@ class StockScorer:
                 score += points * 0.5
 
         # Bonus for CMP well above all MAs (+2) or well below all (-penalty already 0)
-        above_count = sum(1 for col in ['WEMA21', 'WEMA30', 'DSMA50', 'DSMA200']
+        above_count = sum(1 for col in ['WEMA21', 'WEMA30', 'SMA50', 'SMA200']
                           if _safe(row, col, 0) > 0 and cmp > _safe(row, col, 0))
         if above_count == 4:
             score = min(score + 4, 20)

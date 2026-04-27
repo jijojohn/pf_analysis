@@ -217,7 +217,7 @@ class ConfigManager:
         print(f"\n📊 Technical Indicators:")
         print(f"   RSI Period: {tech_config.rsi_period} | Overbought: {tech_config.rsi_overbought} | Oversold: {tech_config.rsi_oversold}")
         print(f"   MACD: {tech_config.macd_fast}/{tech_config.macd_slow}/{tech_config.macd_signal}")
-        print(f"   WEMA Periods: {tech_config.wema_periods}")
+        print(f"   Weekly EMA Periods: {tech_config.wema_periods}")
         print(f"   DSMA Periods: {tech_config.dsma_periods}")
         
         # Filter settings

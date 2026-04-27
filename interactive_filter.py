@@ -51,17 +51,17 @@ class InteractiveFilter:
     def _create_filter_criteria(self) -> Dict:
         """Create filter criteria using configuration settings"""
         return {
-            # CMP vs WEMA filters
-            "Stocks Below WEMA21": lambda df: df[df['CMP'] < df['WEMA21']],
-            "Stocks Above WEMA21": lambda df: df[df['CMP'] > df['WEMA21']],
-            "Stocks Below WEMA30": lambda df: df[df['CMP'] < df['WEMA30']],
-            "Stocks Above WEMA30": lambda df: df[df['CMP'] > df['WEMA30']],
+            # CMP vs Weekly EMA filters
+            "Stocks Below Weekly EMA 21": lambda df: df[df['CMP'] < df['WEMA21']],
+            "Stocks Above Weekly EMA 21": lambda df: df[df['CMP'] > df['WEMA21']],
+            "Stocks Below Weekly EMA 30": lambda df: df[df['CMP'] < df['WEMA30']],
+            "Stocks Above Weekly EMA 30": lambda df: df[df['CMP'] > df['WEMA30']],
             
-            # CMP vs DSMA filters
-            "Stocks Below DSMA50": lambda df: df[df['CMP'] < df['DSMA50']],
-            "Stocks Above DSMA50": lambda df: df[df['CMP'] > df['DSMA50']],
-            "Stocks Below DSMA200": lambda df: df[df['CMP'] < df['DSMA200']],
-            "Stocks Above DSMA200": lambda df: df[df['CMP'] > df['DSMA200']],
+            # CMP vs SMA filters (use current SMA, not displaced)
+            "Stocks Below SMA 50": lambda df: df[df['CMP'] < df['SMA50']],
+            "Stocks Above SMA 50": lambda df: df[df['CMP'] > df['SMA50']],
+            "Stocks Below SMA 200": lambda df: df[df['CMP'] < df['SMA200']],
+            "Stocks Above SMA 200": lambda df: df[df['CMP'] > df['SMA200']],
             
             # 52-Week High Change % filters using configuration
             **{f"52wHCh% > {threshold}%": lambda df, t=threshold: df[df['52wHCh%'] > t] 
@@ -108,10 +108,10 @@ class InteractiveFilter:
             "Low Allocation (<5%)": lambda df: df[df['Percentage_Allocation'] < 5],
             
             # Combined technical filters
-            "Bullish Trend (Above WEMA21 & WEMA30)": lambda df: df[(df['CMP'] > df['WEMA21']) & (df['CMP'] > df['WEMA30'])],
-            "Bearish Trend (Below WEMA21 & WEMA30)": lambda df: df[(df['CMP'] < df['WEMA21']) & (df['CMP'] < df['WEMA30'])],
-            "Above All Moving Averages": lambda df: df[(df['CMP'] > df['WEMA21']) & (df['CMP'] > df['WEMA30']) & (df['CMP'] > df['DSMA50']) & (df['CMP'] > df['DSMA200'])],
-            "Below All Moving Averages": lambda df: df[(df['CMP'] < df['WEMA21']) & (df['CMP'] < df['WEMA30']) & (df['CMP'] < df['DSMA50']) & (df['CMP'] < df['DSMA200'])],
+            "Bullish Trend (Above Weekly EMA 21 & Weekly EMA 30)": lambda df: df[(df['CMP'] > df['WEMA21']) & (df['CMP'] > df['WEMA30'])],
+            "Bearish Trend (Below Weekly EMA 21 & Weekly EMA 30)": lambda df: df[(df['CMP'] < df['WEMA21']) & (df['CMP'] < df['WEMA30'])],
+            "Above All Moving Averages": lambda df: df[(df['CMP'] > df['WEMA21']) & (df['CMP'] > df['WEMA30']) & (df['CMP'] > df['SMA50']) & (df['CMP'] > df['SMA200'])],
+            "Below All Moving Averages": lambda df: df[(df['CMP'] < df['WEMA21']) & (df['CMP'] < df['WEMA30']) & (df['CMP'] < df['SMA50']) & (df['CMP'] < df['SMA200'])],
             
             # Volume filters
             f"High Relative Volume (>= {self._get_volume_config('relative_volume_threshold', 3.0)}x)": 
@@ -179,8 +179,8 @@ class InteractiveFilter:
         guidance = {
             "Week Volume > 2x Month Average": {
                 "what": "Stocks where the last 5-day average volume exceeds 2x the monthly (21-day) average volume. This identifies gradual volume increases during the current week, suggesting building accumulation or emerging market interest.",
-                "how": "• <strong>Check volume columns:</strong> Compare Week_Avg_Volume vs Volume_Threshold_2x (2x monthly average)<br>• <strong>Volume ratio:</strong> Week_Threshold_Ratio >1.0 means current week exceeds the 2x monthly threshold<br>• <strong>Gradual buildup:</strong> This filter is more sensitive than yearly comparisons, catching early trends<br>• <strong>Confirm with price:</strong> Look for steady price advance or base-building patterns<br>• <strong>Monitor trend:</strong> Use WEMA21/30 to confirm if volume increase accompanies uptrend",
-                "action": "• <strong>Ratio 1.0-1.2:</strong> Moderate buildup - early accumulation signal, monitor closely<br>• <strong>Ratio 1.2-1.5:</strong> Strong buildup - increasing interest, consider gradual entry<br>• <strong>Ratio >1.5:</strong> Significant surge - investigate catalyst, potential breakout imminent<br>• <strong>With uptrend (above WEMAs):</strong> Bullish accumulation - favorable entry on pullbacks<br>• <strong>With basing pattern:</strong> Potential breakout setup - prepare for position entry<br>• <strong>With downtrend:</strong> Distribution or capitulation - exercise caution, wait for reversal"
+                "how": "• <strong>Check volume columns:</strong> Compare Week_Avg_Volume vs Volume_Threshold_2x (2x monthly average)<br>• <strong>Volume ratio:</strong> Week_Threshold_Ratio >1.0 means current week exceeds the 2x monthly threshold<br>• <strong>Gradual buildup:</strong> This filter is more sensitive than yearly comparisons, catching early trends<br>• <strong>Confirm with price:</strong> Look for steady price advance or base-building patterns<br>• <strong>Monitor trend:</strong> Use Weekly EMA 21/30 to confirm if volume increase accompanies uptrend",
+                "action": "• <strong>Ratio 1.0-1.2:</strong> Moderate buildup - early accumulation signal, monitor closely<br>• <strong>Ratio 1.2-1.5:</strong> Strong buildup - increasing interest, consider gradual entry<br>• <strong>Ratio >1.5:</strong> Significant surge - investigate catalyst, potential breakout imminent<br>• <strong>With uptrend (above Weekly EMAs):</strong> Bullish accumulation - favorable entry on pullbacks<br>• <strong>With basing pattern:</strong> Potential breakout setup - prepare for position entry<br>• <strong>With downtrend:</strong> Distribution or capitulation - exercise caution, wait for reversal"
             },
             f"High Relative Volume (>= {self._get_volume_config('relative_volume_threshold', 3.0)}x)": {
                 "what": f"Stocks with current day volume at least {self._get_volume_config('relative_volume_threshold', 3.0)}x their 20-day average. Identifies single-day volume spikes often caused by news, earnings, or institutional activity.",
@@ -189,7 +189,7 @@ class InteractiveFilter:
             },
             f"Price Extended from 200 DMA (> {self._get_extension_config('dma_200_extension_threshold', 70.0)}%)": {
                 "what": f"Stocks trading more than {self._get_extension_config('dma_200_extension_threshold', 70.0)}% above their 200-day moving average. Indicates strong momentum but also potential overextension and mean reversion risk.",
-                "how": "• <strong>DMA200_Extension_Pct:</strong> Shows percentage above/below 200 DMA<br>• <strong>Check RSI:</strong> RSI >70 confirms overbought conditions<br>• <strong>Review allocation:</strong> High allocations in extended stocks increase portfolio risk<br>• <strong>Compare with DSMA200:</strong> Displaced moving average provides dynamic support level",
+                "how": "• <strong>DMA200_Extension_Pct:</strong> Shows percentage above/below 200 DMA<br>• <strong>Check RSI:</strong> RSI >70 confirms overbought conditions<br>• <strong>Review allocation:</strong> High allocations in extended stocks increase portfolio risk<br>• <strong>Compare with SMA 200:</strong> Moving average provides dynamic support level",
                 "action": "• <strong>Profitable positions:</strong> Consider partial profit-taking to lock in gains<br>• <strong>RSI >70:</strong> High probability of pullback - raise stops or reduce position<br>• <strong>New entries:</strong> Wait for pullback to 50% retracement or key support<br>• <strong>Trend followers:</strong> Trail stop below recent swing lows to protect gains"
             },
             "In Profit": {
@@ -204,7 +204,7 @@ class InteractiveFilter:
             },
             "RSI > 70": {
                 "what": "Stocks with RSI (Relative Strength Index) above 70, indicating overbought conditions. Momentum is strong but pullback risk is elevated.",
-                "how": "• <strong>RSI column:</strong> Shows current momentum reading<br>• <strong>Check Daily_Change_%:</strong> Assess if momentum is accelerating<br>• <strong>Review price vs WEMA21/30:</strong> Confirm uptrend strength<br>• <strong>Compare allocations:</strong> High RSI stocks shouldn't dominate portfolio",
+                "how": "• <strong>RSI column:</strong> Shows current momentum reading<br>• <strong>Check Daily_Change_%:</strong> Assess if momentum is accelerating<br>• <strong>Review price vs Weekly EMA 21/30:</strong> Confirm uptrend strength<br>• <strong>Compare allocations:</strong> High RSI stocks shouldn't dominate portfolio",
                 "action": "• <strong>RSI 70-80:</strong> Overbought but can continue - trail stops, partial profit<br>• <strong>RSI >80:</strong> Extremely overbought - high reversal risk, take profits<br>• <strong>In profit:</strong> Raise stops to breakeven or recent support<br>• <strong>New positions:</strong> Wait for RSI to cool below 60 before entering"
             },
             "RSI < 30": {
@@ -217,24 +217,24 @@ class InteractiveFilter:
                 "how": "• <strong>Sort by any metric:</strong> Click column headers for multi-dimensional analysis<br>• <strong>Compare across indicators:</strong> RSI, RS, Sharpe Ratio, Allocation<br>• <strong>Use as baseline:</strong> Compare against specific filter results<br>• <strong>Export data:</strong> Download comprehensive dataset for custom analysis",
                 "action": "• <strong>Scan RSI extremes:</strong> Identify overbought (>70) and oversold (<30) stocks<br>• <strong>Review allocations:</strong> Ensure no single stock exceeds 20% of portfolio<br>• <strong>Check losers:</strong> Stocks with negative Sharpe Ratio need attention<br>• <strong>Apply filters:</strong> Use specific filters to drill into subsets of interest"
             },
-            "Bullish Trend (Above WEMA21 & WEMA30)": {
-                "what": "Stocks trading above both WEMA21 and WEMA30 moving averages, indicating short to intermediate-term bullish momentum and uptrend confirmation.",
+            "Bullish Trend (Above Weekly EMA 21 & Weekly EMA 30)": {
+                "what": "Stocks trading above both Weekly EMA 21 and Weekly EMA 30 moving averages, indicating short to intermediate-term bullish momentum and uptrend confirmation.",
                 "how": "• <strong>Verify trend:</strong> Both moving averages should be sloping upward<br>• <strong>Check Daily_Change_%:</strong> Positive daily changes confirm momentum<br>• <strong>Review allocation:</strong> Consider overweighting strong trending stocks<br>• <strong>Monitor RSI:</strong> Avoid entries when RSI >70 (overheated)",
-                "action": "• <strong>Existing positions:</strong> Hold and let trends run, trail stops below WEMAs<br>• <strong>New entries:</strong> Buy on pullbacks to WEMA21 support<br>• <strong>Exit signal:</strong> Close below WEMA21 warrants profit-taking<br>• <strong>Portfolio allocation:</strong> Can maintain higher weights in strong uptrends"
+                "action": "• <strong>Existing positions:</strong> Hold and let trends run, trail stops below Weekly EMAs<br>• <strong>New entries:</strong> Buy on pullbacks to Weekly EMA 21 support<br>• <strong>Exit signal:</strong> Close below Weekly EMA 21 warrants profit-taking<br>• <strong>Portfolio allocation:</strong> Can maintain higher weights in strong uptrends"
             },
-            "Bearish Trend (Below WEMA21 & WEMA30)": {
-                "what": "Stocks trading below both WEMA21 and WEMA30, signaling downtrends and potential continued weakness until trend reversal confirmed.",
-                "how": "• <strong>Identify weakness:</strong> Both WEMAs acting as resistance<br>• <strong>Check RSI:</strong> RSI <30 may signal oversold bounce opportunity<br>• <strong>Review P/L:</strong> Determine if stop-loss levels breached<br>• <strong>Monitor volume:</strong> High volume selloff more concerning than low volume drift",
-                "action": "• <strong>Cut losses:</strong> Exit or reduce positions if fundamental thesis broken<br>• <strong>Oversold bounce:</strong> Only trade if RSI <20 and quality stock<br>• <strong>Wait for confirmation:</strong> Require close above WEMA21 before re-entering<br>• <strong>Reduce allocation:</strong> Minimize exposure to downtrending stocks"
+            "Bearish Trend (Below Weekly EMA 21 & Weekly EMA 30)": {
+                "what": "Stocks trading below both Weekly EMA 21 and Weekly EMA 30, signaling downtrends and potential continued weakness until trend reversal confirmed.",
+                "how": "• <strong>Identify weakness:</strong> Both Weekly EMAs acting as resistance<br>• <strong>Check RSI:</strong> RSI <30 may signal oversold bounce opportunity<br>• <strong>Review P/L:</strong> Determine if stop-loss levels breached<br>• <strong>Monitor volume:</strong> High volume selloff more concerning than low volume drift",
+                "action": "• <strong>Cut losses:</strong> Exit or reduce positions if fundamental thesis broken<br>• <strong>Oversold bounce:</strong> Only trade if RSI <20 and quality stock<br>• <strong>Wait for confirmation:</strong> Require close above Weekly EMA 21 before re-entering<br>• <strong>Reduce allocation:</strong> Minimize exposure to downtrending stocks"
             },
             "Above All Moving Averages": {
-                "what": "Stocks trading above WEMA21, WEMA30, DSMA50, and DSMA200 - the strongest trend confirmation indicating all timeframes are bullish.",
+                "what": "Stocks trading above Weekly EMA 21, Weekly EMA 30, SMA 50, and SMA 200 - the strongest trend confirmation indicating all timeframes are bullish.",
                 "how": "• <strong>Confirm multi-timeframe trend:</strong> All MAs sloping upward is ideal<br>• <strong>Check extension:</strong> Review DMA200_Extension_Pct for overextension risk<br>• <strong>Monitor momentum:</strong> RSI and Daily_Change_% show trend strength<br>• <strong>Assess allocations:</strong> These leaders may deserve higher weights",
-                "action": "• <strong>Core holdings:</strong> Can hold larger positions in these strongest stocks<br>• <strong>Pullback entries:</strong> Buy dips to DSMA50 or WEMA30 support<br>• <strong>Trail stops:</strong> Use DSMA50 or WEMA30 as dynamic stop levels<br>• <strong>Rebalancing:</strong> Take partial profits if allocation exceeds 20%"
+                "action": "• <strong>Core holdings:</strong> Can hold larger positions in these strongest stocks<br>• <strong>Pullback entries:</strong> Buy dips to SMA 50 or Weekly EMA 30 support<br>• <strong>Trail stops:</strong> Use SMA 50 or Weekly EMA 30 as dynamic stop levels<br>• <strong>Rebalancing:</strong> Take partial profits if allocation exceeds 20%"
             },
             "Below All Moving Averages": {
-                "what": "Stocks below all key moving averages (WEMA21, WEMA30, DSMA50, DSMA200) - strongest bearish signal requiring caution or exit.",
-                "how": "• <strong>Assess damage:</strong> Check Profit/Loss and drawdown severity<br>• <strong>Review fundamentals:</strong> Determine if decline is technical or fundamental<br>• <strong>Check RSI:</strong> Extreme oversold (RSI <20) may indicate capitulation<br>• <strong>Monitor for reversal:</strong> Need closes above at least WEMA21 to rebuild trust",
+                "what": "Stocks below all key moving averages (Weekly EMA 21, Weekly EMA 30, SMA 50, SMA 200) - strongest bearish signal requiring caution or exit.",
+                "how": "• <strong>Assess damage:</strong> Check Profit/Loss and drawdown severity<br>• <strong>Review fundamentals:</strong> Determine if decline is technical or fundamental<br>• <strong>Check RSI:</strong> Extreme oversold (RSI <20) may indicate capitulation<br>• <strong>Monitor for reversal:</strong> Need closes above at least Weekly EMA 21 to rebuild trust",
                 "action": "• <strong>High priority review:</strong> These are your weakest positions<br>• <strong>Consider exits:</strong> Unless strong fundamental conviction, exit or reduce size<br>• <strong>Strict stops:</strong> Any further decline below recent lows is final exit signal<br>• <strong>Reallocation:</strong> Move capital to Above All Moving Averages stocks"
             },
             "Near 52-Week High (within 5%)": {
@@ -316,45 +316,45 @@ class InteractiveFilter:
         
         # Add Moving Average filters
         guidance.update({
-            "Stocks Below WEMA21": {
-                "what": "Stocks trading below their 21-period Wilder's Exponential Moving Average, indicating short-term weakness or pullback phase.",
-                "how": "• <strong>Compare CMP vs WEMA21:</strong> Negative divergence shows weakness<br>• <strong>Check other MAs:</strong> If above WEMA30/DSMA50, may be temporary pullback<br>• <strong>Monitor RSI:</strong> RSI <30 may indicate oversold bounce opportunity<br>• <strong>Review volume:</strong> Low volume decline less concerning than high volume",
-                "action": "• <strong>Short-term traders:</strong> Avoid longs until price reclaims WEMA21<br>• <strong>Existing positions:</strong> Tighten stops or take partial profits<br>• <strong>Buy opportunities:</strong> If above longer MAs, pullback to WEMA21 = potential entry<br>• <strong>Exit signal:</strong> Break of WEMA30 confirms deeper correction"
+            "Stocks Below Weekly EMA 21": {
+                "what": "Stocks trading below their 21-period Exponential Moving Average, indicating short-term weakness or pullback phase.",
+                "how": "• <strong>Compare CMP vs Weekly EMA 21:</strong> Negative divergence shows weakness<br>• <strong>Check other MAs:</strong> If above Weekly EMA 30/SMA 50, may be temporary pullback<br>• <strong>Monitor RSI:</strong> RSI <30 may indicate oversold bounce opportunity<br>• <strong>Review volume:</strong> Low volume decline less concerning than high volume",
+                "action": "• <strong>Short-term traders:</strong> Avoid longs until price reclaims Weekly EMA 21<br>• <strong>Existing positions:</strong> Tighten stops or take partial profits<br>• <strong>Buy opportunities:</strong> If above longer MAs, pullback to Weekly EMA 21 = potential entry<br>• <strong>Exit signal:</strong> Break of Weekly EMA 30 confirms deeper correction"
             },
-            "Stocks Above WEMA21": {
-                "what": "Stocks above 21-period Wilder's EMA, showing short-term bullish momentum and near-term trend strength suitable for continuation strategies.",
-                "how": "• <strong>CMP > WEMA21:</strong> Bullish short-term signal<br>• <strong>Check slope:</strong> Rising WEMA21 confirms uptrend<br>• <strong>Monitor pullbacks:</strong> Dips toward WEMA21 are buying opportunities<br>• <strong>Confirm with RSI:</strong> RSI 40-70 range indicates healthy momentum",
-                "action": "• <strong>Existing positions:</strong> Hold and trail stops below WEMA21<br>• <strong>New entries:</strong> Buy pullbacks to WEMA21 support<br>• <strong>Trend following:</strong> Stay long as price remains above WEMA21<br>• <strong>Exit:</strong> Close below WEMA21 is warning, below WEMA30 is exit signal"
+            "Stocks Above Weekly EMA 21": {
+                "what": "Stocks above 21-period EMA, showing short-term bullish momentum and near-term trend strength suitable for continuation strategies.",
+                "how": "• <strong>CMP > Weekly EMA 21:</strong> Bullish short-term signal<br>• <strong>Check slope:</strong> Rising Weekly EMA 21 confirms uptrend<br>• <strong>Monitor pullbacks:</strong> Dips toward Weekly EMA 21 are buying opportunities<br>• <strong>Confirm with RSI:</strong> RSI 40-70 range indicates healthy momentum",
+                "action": "• <strong>Existing positions:</strong> Hold and trail stops below Weekly EMA 21<br>• <strong>New entries:</strong> Buy pullbacks to Weekly EMA 21 support<br>• <strong>Trend following:</strong> Stay long as price remains above Weekly EMA 21<br>• <strong>Exit:</strong> Close below Weekly EMA 21 is warning, below Weekly EMA 30 is exit signal"
             },
-            "Stocks Below WEMA30": {
-                "what": "Stocks below 30-period Wilder's EMA, indicating intermediate-term weakness and potential developing downtrend requiring caution.",
-                "how": "• <strong>CMP < WEMA30:</strong> Intermediate weakness confirmed<br>• <strong>Check WEMA21:</strong> If both WEMAs broken, trend change likely<br>• <strong>Review Profit/Loss:</strong> Assess if losses are acceptable<br>• <strong>Monitor for bounce:</strong> Oversold RSI + quality stock = watch for reversal",
-                "action": "• <strong>Below both WEMAs:</strong> Strong exit or reduce position signal<br>• <strong>Tighten stops:</strong> Use recent swing lows as stop-loss levels<br>• <strong>Reassess thesis:</strong> Determine if weakness is temporary or structural<br>• <strong>Wait for recovery:</strong> Require close above WEMA30 before re-entering"
+            "Stocks Below Weekly EMA 30": {
+                "what": "Stocks below 30-period EMA, indicating intermediate-term weakness and potential developing downtrend requiring caution.",
+                "how": "• <strong>CMP < Weekly EMA 30:</strong> Intermediate weakness confirmed<br>• <strong>Check Weekly EMA 21:</strong> If both Weekly EMAs broken, trend change likely<br>• <strong>Review Profit/Loss:</strong> Assess if losses are acceptable<br>• <strong>Monitor for bounce:</strong> Oversold RSI + quality stock = watch for reversal",
+                "action": "• <strong>Below both Weekly EMAs:</strong> Strong exit or reduce position signal<br>• <strong>Tighten stops:</strong> Use recent swing lows as stop-loss levels<br>• <strong>Reassess thesis:</strong> Determine if weakness is temporary or structural<br>• <strong>Wait for recovery:</strong> Require close above Weekly EMA 30 before re-entering"
             },
-            "Stocks Above WEMA30": {
-                "what": "Stocks above 30-period Wilder's EMA, confirming intermediate-term uptrend and suitable for swing trading strategies with good risk/reward.",
-                "how": "• <strong>CMP > WEMA30:</strong> Intermediate uptrend intact<br>• <strong>Best with WEMA21:</strong> Above both WEMAs = strong bullish configuration<br>• <strong>Use as support:</strong> WEMA30 often acts as pullback support level<br>• <strong>Monitor momentum:</strong> Rising WEMA30 slope confirms trend strength",
-                "action": "• <strong>Core positions:</strong> Maintain higher allocations in these stocks<br>• <strong>Pullback entries:</strong> Buy dips to WEMA30 support<br>• <strong>Dynamic stops:</strong> Trail stops below WEMA30 to protect gains<br>• <strong>Trend strength:</strong> Can hold through minor WEMA21 violations if WEMA30 holds"
+            "Stocks Above Weekly EMA 30": {
+                "what": "Stocks above 30-period EMA, confirming intermediate-term uptrend and suitable for swing trading strategies with good risk/reward.",
+                "how": "• <strong>CMP > Weekly EMA 30:</strong> Intermediate uptrend intact<br>• <strong>Best with Weekly EMA 21:</strong> Above both Weekly EMAs = strong bullish configuration<br>• <strong>Use as support:</strong> Weekly EMA 30 often acts as pullback support level<br>• <strong>Monitor momentum:</strong> Rising Weekly EMA 30 slope confirms trend strength",
+                "action": "• <strong>Core positions:</strong> Maintain higher allocations in these stocks<br>• <strong>Pullback entries:</strong> Buy dips to Weekly EMA 30 support<br>• <strong>Dynamic stops:</strong> Trail stops below Weekly EMA 30 to protect gains<br>• <strong>Trend strength:</strong> Can hold through minor Weekly EMA 21 violations if Weekly EMA 30 holds"
             },
-            "Stocks Below DSMA50": {
-                "what": "Stocks below 50-day Displaced Moving Average, signaling intermediate-term trend weakness and potential transition to downtrend.",
-                "how": "• <strong>CMP < DSMA50:</strong> Losing key support level<br>• <strong>Check DSMA200:</strong> If both broken, significant weakness<br>• <strong>Volume analysis:</strong> High volume break = serious, low volume = possible retest<br>• <strong>RSI context:</strong> Deep oversold may create bounce opportunity",
-                "action": "• <strong>Reduce exposure:</strong> Lighten positions or exit if below multiple MAs<br>• <strong>Wait for recovery:</strong> Need sustained move back above DSMA50<br>• <strong>Reassess trend:</strong> May be transitioning from uptrend to downtrend<br>• <strong>Capital preservation:</strong> Better opportunities likely exist elsewhere"
+            "Stocks Below SMA 50": {
+                "what": "Stocks below 50-day Simple Moving Average, signaling intermediate-term trend weakness and potential transition to downtrend.",
+                "how": "• <strong>CMP < SMA 50:</strong> Losing key support level<br>• <strong>Check SMA 200:</strong> If both broken, significant weakness<br>• <strong>Volume analysis:</strong> High volume break = serious, low volume = possible retest<br>• <strong>RSI context:</strong> Deep oversold may create bounce opportunity",
+                "action": "• <strong>Reduce exposure:</strong> Lighten positions or exit if below multiple MAs<br>• <strong>Wait for recovery:</strong> Need sustained move back above SMA 50<br>• <strong>Reassess trend:</strong> May be transitioning from uptrend to downtrend<br>• <strong>Capital preservation:</strong> Better opportunities likely exist elsewhere"
             },
-            "Stocks Above DSMA50": {
-                "what": "Stocks above 50-day Displaced MA, maintaining intermediate-term uptrend and showing price strength relative to recent history.",
-                "how": "• <strong>CMP > DSMA50:</strong> Healthy intermediate trend<br>• <strong>Pullback zones:</strong> DSMA50 often provides support on corrections<br>• <strong>Trend confirmation:</strong> Ideally also above DSMA200 for full trend alignment<br>• <strong>Monitor RSI:</strong> Can hold positions even if RSI dips to 40-50 range",
-                "action": "• <strong>Position management:</strong> Hold and add on pullbacks to DSMA50<br>• <strong>Stop placement:</strong> Use DSMA50 as trailing stop reference<br>• <strong>Swing trades:</strong> Good for multi-week holding periods<br>• <strong>Exit criteria:</strong> Decisive close below DSMA50 warrants re-evaluation"
+            "Stocks Above SMA 50": {
+                "what": "Stocks above 50-day Simple Moving Average, maintaining intermediate-term uptrend and showing price strength relative to recent history.",
+                "how": "• <strong>CMP > SMA 50:</strong> Healthy intermediate trend<br>• <strong>Pullback zones:</strong> SMA 50 often provides support on corrections<br>• <strong>Trend confirmation:</strong> Ideally also above SMA 200 for full trend alignment<br>• <strong>Monitor RSI:</strong> Can hold positions even if RSI dips to 40-50 range",
+                "action": "• <strong>Position management:</strong> Hold and add on pullbacks to SMA 50<br>• <strong>Stop placement:</strong> Use SMA 50 as trailing stop reference<br>• <strong>Swing trades:</strong> Good for multi-week holding periods<br>• <strong>Exit criteria:</strong> Decisive close below SMA 50 warrants re-evaluation"
             },
-            "Stocks Below DSMA200": {
-                "what": "Stocks below 200-day Displaced MA, in long-term downtrend or correction phase. Major warning signal requiring defensive action.",
-                "how": "• <strong>CMP < DSMA200:</strong> Long-term trend is bearish<br>• <strong>Check extension:</strong> How far below? Deep oversold may be extreme<br>• <strong>Fundamental review:</strong> Determine if secular decline or cyclical<br>• <strong>Monitor for base:</strong> Bottoming patterns take time to form",
-                "action": "• <strong>High priority exits:</strong> Strong sell signal unless deep value or turnaround story<br>• <strong>Avoid new purchases:</strong> Catching falling knife is dangerous<br>• <strong>Require proof:</strong> Need sustained move above DSMA200 for re-entry<br>• <strong>Capital allocation:</strong> Focus on Above DSMA200 stocks instead"
+            "Stocks Below SMA 200": {
+                "what": "Stocks below 200-day Simple Moving Average, in long-term downtrend or correction phase. Major warning signal requiring defensive action.",
+                "how": "• <strong>CMP < SMA 200:</strong> Long-term trend is bearish<br>• <strong>Check extension:</strong> How far below? Deep oversold may be extreme<br>• <strong>Fundamental review:</strong> Determine if secular decline or cyclical<br>• <strong>Monitor for base:</strong> Bottoming patterns take time to form",
+                "action": "• <strong>High priority exits:</strong> Strong sell signal unless deep value or turnaround story<br>• <strong>Avoid new purchases:</strong> Catching falling knife is dangerous<br>• <strong>Require proof:</strong> Need sustained move above SMA 200 for re-entry<br>• <strong>Capital allocation:</strong> Focus on Above SMA 200 stocks instead"
             },
-            "Stocks Above DSMA200": {
-                "what": "Stocks above 200-day Displaced MA, in confirmed long-term uptrend. Core holding candidates with established bullish bias.",
-                "how": "• <strong>CMP > DSMA200:</strong> Long-term trend is bullish<br>• <strong>Major support:</strong> DSMA200 provides key support on corrections<br>• <strong>Check all MAs:</strong> Best when above all moving averages<br>• <strong>Extension risk:</strong> Monitor DMA200_Extension_Pct for overextension",
-                "action": "• <strong>Core holdings:</strong> Can maintain larger position sizes<br>• <strong>Buy dips:</strong> Pullbacks to DSMA200 are high-probability entries<br>• <strong>Long-term holds:</strong> Suitable for buy-and-hold strategy<br>• <strong>Trend following:</strong> Stay invested as long as above DSMA200"
+            "Stocks Above SMA 200": {
+                "what": "Stocks above 200-day Simple Moving Average, in confirmed long-term uptrend. Core holding candidates with established bullish bias.",
+                "how": "• <strong>CMP > SMA 200:</strong> Long-term trend is bullish<br>• <strong>Major support:</strong> SMA 200 provides key support on corrections<br>• <strong>Check all MAs:</strong> Best when above all moving averages<br>• <strong>Extension risk:</strong> Monitor DMA200_Extension_Pct for overextension",
+                "action": "• <strong>Core holdings:</strong> Can maintain larger position sizes<br>• <strong>Buy dips:</strong> Pullbacks to SMA 200 are high-probability entries<br>• <strong>Long-term holds:</strong> Suitable for buy-and-hold strategy<br>• <strong>Trend following:</strong> Stay invested as long as above SMA 200"
             },
             f"RSI Neutral ({self.tech_config.rsi_oversold}-{self.tech_config.rsi_overbought})": {
                 "what": f"Stocks with RSI between {self.tech_config.rsi_oversold} and {self.tech_config.rsi_overbought}, showing balanced momentum neither overbought nor oversold. Typically consolidation or ranging markets.",
@@ -493,8 +493,14 @@ class InteractiveFilter:
         """
         
         # Add column headers with sorting capability
+        # Map internal column names to display labels
+        col_display_names = {
+            'WEMA21': 'Weekly EMA 21', 'WEMA30': 'Weekly EMA 30',
+            'DSMA50': 'DSMA 50', 'DSMA200': 'DSMA 200',
+        }
         for col in available_columns:
-            table_html += f'<th onclick="sortTable(this)">{col} <span class="sort-arrow">⇅</span></th>'
+            display_name = col_display_names.get(col, col)
+            table_html += f'<th onclick="sortTable(this)">{display_name} <span class="sort-arrow">⇅</span></th>'
         table_html += "</tr></thead><tbody>"
         
         # Add data rows
@@ -851,7 +857,7 @@ class InteractiveFilter:
         fig = make_subplots(
             rows=2, cols=2,
             subplot_titles=(
-                'Current Price vs WEMA21/WEMA30',
+                'Current Price vs Weekly EMA 21/30',
                 'RSI Distribution',
                 '52-Week Performance',
                 'Risk vs Return (Volatility vs Sharpe Ratio)'
@@ -862,19 +868,19 @@ class InteractiveFilter:
         
         symbols = filtered_data['Symbol'].tolist()
         
-        # Chart 1: Price vs WEMA
+        # Chart 1: Price vs Weekly EMA
         fig.add_trace(
             go.Bar(x=symbols, y=filtered_data['CMP'], name='Current Price', marker_color='blue'),
             row=1, col=1
         )
         fig.add_trace(
             go.Scatter(x=symbols, y=filtered_data['WEMA21'], mode='markers+lines', 
-                      name='WEMA21', marker_color='orange'),
+                      name='Weekly EMA 21', marker_color='orange'),
             row=1, col=1
         )
         fig.add_trace(
             go.Scatter(x=symbols, y=filtered_data['WEMA30'], mode='markers+lines',
-                      name='WEMA30', marker_color='red'),
+                      name='Weekly EMA 30', marker_color='red'),
             row=1, col=1
         )
         
@@ -1035,9 +1041,9 @@ class InteractiveFilter:
             bullish = df[(df['CMP'] > df['WEMA21']) & (df['CMP'] > df['WEMA30'])]
             bearish = df[(df['CMP'] < df['WEMA21']) & (df['CMP'] < df['WEMA30'])]
             if len(bullish) > len(bearish):
-                working.append(f"{len(bullish)} stocks in bullish trend (above WEMA21 & WEMA30)")
+                working.append(f"{len(bullish)} stocks in bullish trend (above Weekly EMA 21 & Weekly EMA 30)")
             if len(bearish) > 0:
-                attention.append(f"{len(bearish)} stocks in bearish trend — below both WEMAs")
+                attention.append(f"{len(bearish)} stocks in bearish trend — below both Weekly EMAs")
 
         # Risk
         if 'Sharpe_Ratio' in df.columns:

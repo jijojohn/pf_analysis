@@ -934,17 +934,17 @@ class PortfolioApp:
         """Generate multiple filtered reports — parallel when configured"""
         if filter_names is None:
             essential_filters = [
-                "Stocks Below WEMA30",
-                "Stocks Above WEMA30", 
+                "Stocks Below Weekly EMA 30",
+                "Stocks Above Weekly EMA 30", 
                 "Near 52-Week High (within 5%)",
                 "Oversold (RSI < 30)",
                 "Overbought (RSI > 70)",
                 "In Profit",
                 "In Loss",
-                "Stocks Below WEMA21",
-                "Stocks Above WEMA21",
-                "Stocks Below DSMA50",
-                "Stocks Above DSMA50"
+                "Stocks Below Weekly EMA 21",
+                "Stocks Above Weekly EMA 21",
+                "Stocks Below SMA 50",
+                "Stocks Above SMA 50"
             ]
             try:
                 if hasattr(self, 'comprehensive_dataset') and not self.comprehensive_dataset.empty:

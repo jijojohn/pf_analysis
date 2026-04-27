@@ -71,11 +71,13 @@ run.sh → venv activation → verify_data_freshness.py → update_portfolio_dat
 
 ### Technical indicators in the comprehensive dataset
 
-- **Moving averages:** WEMA21, WEMA30, DSMA50, DSMA200, SMA50, SMA150, SMA200
-- **Internal only (not in dataset columns):** SMA20, EMA12, EMA26, EMA50, MACD, Bollinger Bands, Stochastic, ATR, Williams %R
+- **Moving averages:** WEMA21 (Weekly EMA 21), WEMA30 (Weekly EMA 30), DSMA50, DSMA200, SMA50, SMA150, SMA200
+- **Internal only (not in dataset columns):** SMA20, EMA12, EMA26, EMA50, MACD, Bollinger Bands, Stochastic (Slow 14,3,3), ATR, Williams %R
+- **Note:** WEMA21/WEMA30 are proper EMA (exponential moving average, `adjust=False`) on daily close. DSMA50/DSMA200 are displaced (shifted) SMAs kept as reference columns. Filters and scoring use current SMA50/SMA200 (not displaced).
+- **TradingView alignment:** All indicators use TradingView-compatible formulas. RSI and ATR use Wilder's RMA (`ewm(alpha=1/period, adjust=False)`). EMA uses `adjust=False`. Stochastic is Slow (K smoothed by SMA3). Bollinger Bands use population std dev (`ddof=0`).
 - **Minervini:** Stage (1–4), Stage_Name, TT_Score (0–8), Stage_Action, SMA200_Slope
 - **52-week:** 52wH, 52wL, 52wHCh%, 52wLCh%
-- **Momentum:** RSI (14-period, reference only — NOT used in scoring), RS (vs NIFTY 50 benchmark)
+- **Momentum:** RSI (14-period Wilder's RMA, reference only — NOT used in scoring), RS (vs NIFTY 50 benchmark)
 - **Risk:** Sharpe Ratio, Sortino Ratio, Standard Deviation
 - **Volume:** OBV, A/D Line, Relative_Volume, Week/Month avg, Volume_Threshold_2x, Week_Threshold_Ratio
 - **Extension:** DMA200_Extension_Pct
@@ -131,9 +133,9 @@ run.sh → venv activation → verify_data_freshness.py → update_portfolio_dat
 
 ## Implemented: Higher High / Higher Low swing detection
 
-- `_detect_hh_hl()` in technical_indicators.py using **5-bar pivot detection** (11-bar window)
+- `_detect_hh_hl()` in technical_indicators.py using **5-bar pivot detection** (11-bar window) on **daily chart data**
 - Scans last 63 trading days (~3 months) for swing points
-- A swing high: bar whose high is the highest in ±5 bars; swing low: bar whose low is the lowest in ±5 bars
+- A swing high: bar whose high is the highest in ±5 bars (first occurrence wins on ties); swing low: bar whose low is the lowest in ±5 bars
 - HH = last pivot high > prior pivot high; HL = last pivot low > prior pivot low
 - 3 new dataset columns: HH (bool), HL (bool), Swing_Trend (Bullish/Bearish/Weakening/Topping)
 - 4 new swing filters in interactive_filter.py:
@@ -244,3 +246,57 @@ run.sh → venv activation → verify_data_freshness.py → update_portfolio_dat
 - For plans: Use a short checklist then the proposed diff summary.
 - For tests: Show commands you ran and the result summary.
 - For documentation: Show the updated sections with context.
+
+## Implemented: Moving average & swing detection corrections (v3.2)
+
+### WEMA calculation fix
+
+- Changed from WMA (linearly weighted: weights [1,2,...,n]) to proper **EMA** (`ewm(span=period, adjust=False)`)
+- Column names remain `WEMA21`/`WEMA30` internally; display labels changed to "Weekly EMA 21"/"Weekly EMA 30"
+- Affects: `technical_indicators.py`, all report labels, filter names, alert text, signal verdicts
+
+### DSMA filter correctness fix
+
+- Filters and scoring now compare CMP against **current SMA50/SMA200** (not displaced DSMA50/DSMA200)
+- DSMA columns remain in dataset as reference indicators; displacement causes stale values unsuitable for above/below filtering
+- Affects: `interactive_filter.py` (8 filter lambdas + "Above/Below All MAs"), `stock_scorer.py` (trend score), `signal_engine.py`, `alert_engine.py`, `portfolio_health.py`
+- Filter names renamed: "Stocks Below DSMA50" → "Stocks Below SMA 50", "Stocks Above DSMA200" → "Stocks Above SMA 200", etc.
+
+### HH/HL pivot detection fix
+
+- Removed overly strict uniqueness check `list(window).count(val) == 1` that skipped valid pivots when two bars shared the same high/low
+- New logic: accepts pivot if the bar is the **first occurrence** of the max/min in the ±5-bar window (`np.argmax`/`np.argmin`)
+- Detection still uses daily chart data (high/low), 63-day lookback, 5-bar pivot window
+
+### Display label changes
+
+- All user-facing text: "WEMA21" → "Weekly EMA 21", "WEMA30" → "Weekly EMA 30"
+- All user-facing text: "DSMA50" → "SMA 50", "DSMA200" → "SMA 200" (in filter names and guidance)
+- Table column headers in filtered reports show display names via `col_display_names` mapping
+- Updated across: `interactive_filter.py`, `alert_engine.py`, `signal_engine.py`, `portfolio_health.py`, `config_manager.py`
+
+## Implemented: TradingView-compatible indicator formulas (v3.3)
+
+### Indicators aligned to TradingView defaults
+
+All technical indicator calculations in `technical_indicators.py` now match TradingView's built-in indicator formulas:
+
+| Indicator           | Previous Method                  | TradingView Method                             | Change                                |
+| ------------------- | -------------------------------- | ---------------------------------------------- | ------------------------------------- |
+| **RSI**             | SMA-based (`rolling(14).mean()`) | Wilder's RMA (`ewm(alpha=1/14, adjust=False)`) | Less extreme values, better smoothing |
+| **EMA**             | `ewm(span, adjust=True)`         | `ewm(span, adjust=False)`                      | Standard recursive EMA                |
+| **MACD**            | adjust=True EMAs                 | adjust=False EMAs (via EMA fix)                | Consistent with TradingView           |
+| **ATR**             | SMA-based (`rolling(14).mean()`) | Wilder's RMA (`ewm(alpha=1/14, adjust=False)`) | Smoother volatility measure           |
+| **Stochastic**      | Fast (%K raw, %D=SMA3)           | Slow (%K=SMA3 of rawK, %D=SMA3 of %K)          | Default 14,3,3 like TradingView       |
+| **Bollinger Bands** | Sample std (`ddof=1`)            | Population std (`ddof=0`)                      | Matches TradingView exactly           |
+| **SMA**             | `rolling().mean()`               | Same                                           | No change needed                      |
+| **Williams %R**     | Standard                         | Standard                                       | No change needed                      |
+| **OBV**             | Standard                         | Standard                                       | No change needed                      |
+
+### Key formula references
+
+- **Wilder's RMA** (used by RSI, ATR): `ewm(alpha=1/period, adjust=False).mean()` — equivalent to TradingView's `ta.rma()`
+- **EMA**: `ewm(span=period, adjust=False).mean()` — equivalent to TradingView's `ta.ema()`
+- **SMA**: `rolling(window=period).mean()` — equivalent to TradingView's `ta.sma()`
+- **Slow Stochastic**: raw %K smoothed by SMA(3), then %D = SMA(3) of smoothed %K
+- Any future indicator additions MUST use TradingView-compatible formulas

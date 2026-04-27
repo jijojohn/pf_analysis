@@ -109,7 +109,7 @@ class PortfolioHealthDashboard:
 
         # Momentum health
         metrics['pct_above_wema21'] = round(len(df[df['CMP'] > df['WEMA21']]) / max(len(df), 1) * 100, 1)
-        metrics['pct_above_dsma200'] = round(len(df[df['CMP'] > df['DSMA200']]) / max(len(df), 1) * 100, 1)
+        metrics['pct_above_sma200'] = round(len(df[df['CMP'] > df['SMA200']]) / max(len(df), 1) * 100, 1)
         metrics['pct_positive_rs'] = round(len(df[df['RS'] > 0]) / max(len(df), 1) * 100, 1)
 
         # Risk alerts
@@ -224,8 +224,8 @@ class PortfolioHealthDashboard:
 <div class="section">
 <h2>📈 Momentum Health</h2>
 <div class="cards" style="justify-content:flex-start">
-  <div class="card"><div class="label">Above WEMA21</div><div class="value">{m['pct_above_wema21']:.0f}%</div></div>
-  <div class="card"><div class="label">Above DSMA200</div><div class="value">{m['pct_above_dsma200']:.0f}%</div></div>
+  <div class="card"><div class="label">Above Weekly EMA 21</div><div class="value">{m['pct_above_wema21']:.0f}%</div></div>
+  <div class="card"><div class="label">Above SMA 200</div><div class="value">{m['pct_above_sma200']:.0f}%</div></div>
   <div class="card"><div class="label">Positive RS</div><div class="value">{m['pct_positive_rs']:.0f}%</div></div>
   <div class="card"><div class="label">Neg. Sharpe</div><div class="value" style="color:#f44336">{m['neg_sharpe_count']}</div></div>
   <div class="card"><div class="label">High Drawdown</div><div class="value" style="color:#f44336">{m['high_drawdown_count']}</div><div class="sub">52wH &lt; -30%</div></div>

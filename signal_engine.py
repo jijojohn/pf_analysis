@@ -65,7 +65,7 @@ class SignalEngine:
         cmp = _safe(row, 'CMP', 0)
         wema21 = _safe(row, 'WEMA21', cmp)
         wema30 = _safe(row, 'WEMA30', cmp)
-        dsma200 = _safe(row, 'DSMA200', cmp)
+        dsma200 = _safe(row, 'SMA200', cmp)  # Use current SMA200, not displaced
         h52_chg = _safe(row, '52wHCh%', 0)
         rel_vol = _safe(row, 'Relative_Volume', 0)
         symbol = row.get('Symbol', '?')
@@ -88,9 +88,9 @@ class SignalEngine:
             bearish_factors.append(f"RS {rs:.2f} (underperforming)")
 
         if above_wema21 and above_wema30:
-            bullish_factors.append("Above WEMA21 & WEMA30")
+            bullish_factors.append("Above Weekly EMA 21 & 30")
         elif not above_wema21 and not above_wema30:
-            bearish_factors.append("Below WEMA21 & WEMA30")
+            bearish_factors.append("Below Weekly EMA 21 & 30")
 
         if sharpe > 1:
             bullish_factors.append(f"Sharpe {sharpe:.1f}")
@@ -115,9 +115,9 @@ class SignalEngine:
             bullish_factors.append(f"RelVol {rel_vol:.1f}x")
 
         if above_dsma200:
-            bullish_factors.append("Above DSMA200")
+            bullish_factors.append("Above SMA 200")
         else:
-            bearish_factors.append("Below DSMA200")
+            bearish_factors.append("Below SMA 200")
 
         if h52_chg < -30:
             bearish_factors.append(f"52wH {h52_chg:.0f}%")

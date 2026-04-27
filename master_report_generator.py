@@ -6,6 +6,7 @@ Creates a comprehensive master report page with links to all sub-reports
 
 import os
 import re
+import html
 import pandas as pd
 from datetime import datetime, date
 from typing import List, Dict, Optional
@@ -120,40 +121,46 @@ class MasterReportGenerator:
             
         return {}
     
+    def _read_report_head(self, filename: str) -> str:
+        """Read first 20KB of a report HTML file (cached)."""
+        if not hasattr(self, '_head_cache'):
+            self._head_cache = {}
+        if filename not in self._head_cache:
+            try:
+                filepath = os.path.join(self.reports_dir, filename)
+                with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                    self._head_cache[filename] = f.read(20480)
+            except Exception:
+                self._head_cache[filename] = ""
+        return self._head_cache[filename]
+
     def _get_filtered_count(self, filename: str) -> Optional[int]:
         """Extract stock count from a filtered report HTML file."""
-        try:
-            filepath = os.path.join(self.reports_dir, filename)
-            # Read first 20KB — CSS takes ~15KB before the count appears
-            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-                head = f.read(20480)
-            m = re.search(r'(\d+)\s+stocks?', head)
-            if m:
-                return int(m.group(1))
-        except Exception:
-            pass
+        head = self._read_report_head(filename)
+        m = re.search(r'Showing (\d+) stocks?\b', head)
+        if m:
+            return int(m.group(1))
         return None
-    
+
     def format_filter_name(self, filename: str) -> str:
-        """Convert filename to readable filter name"""
-        # Remove prefix and suffix
+        """Extract readable filter name from HTML <title> tag, with filename fallback."""
+        head = self._read_report_head(filename)
+        m = re.search(r'<title>Filtered Portfolio Report - (.+?)</title>', head)
+        if m:
+            return m.group(1)
+        # Fallback: reverse the _safe_filename() transformation
         name = filename.replace("filtered_report_", "").replace(f"_{self.today}.html", "")
-        
-        # Handle special cases
-        replacements = {
-            "_>_": " > ",
-            "_<_": " < ",
-            "pct": "%",
-            "_": " ",
-            "RS RS": "RS",
-            "wHChpct": "wHCh%",
-            "wLChpct": "wLCh%"
-        }
-        
-        for old, new in replacements.items():
-            name = name.replace(old, new)
-            
-        return name.title()
+        name = (name
+                .replace("__greater_than__", " > ")
+                .replace("__less_than__", " < ")
+                .replace("__equals__", " = ")
+                .replace("__and__", " & ")
+                .replace("__or__", "/")
+                .replace("pct", "%")
+                .replace("_", " "))
+        # Restore decimals: "3 0" → "3.0"
+        name = re.sub(r'(\d+) (\d+)', r'\1.\2', name)
+        return name.strip()
     
     def generate_master_report(self) -> str:
         """Generate master report HTML"""
@@ -365,9 +372,10 @@ class MasterReportGenerator:
                 icon = "📈" if "Strong" in filter_name else "📉" if "Weak" in filter_name else "🔍"
                 count = self._get_filtered_count(report)
                 badge = f' <span style="background:#30363d;color:#58a6ff;padding:2px 8px;border-radius:10px;font-size:0.8em;margin-left:6px;">{count}</span>' if count is not None else ''
+                safe_name = html.escape(filter_name)
                 html_content += f"""
                 <a href="{report}" class="report-link">
-                    {icon} {filter_name}{badge}
+                    {icon} {safe_name}{badge}
                 </a>
 """
             html_content += """

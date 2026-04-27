@@ -23,11 +23,11 @@ class TechnicalIndicators:
     
     @staticmethod
     def calculate_ema(data: pd.Series, period: int) -> pd.Series:
-        """Exponential Moving Average"""
-        return data.ewm(span=period).mean()
+        """Exponential Moving Average (TradingView-compatible: adjust=False)"""
+        return data.ewm(span=period, adjust=False).mean()
     
     def calculate_rsi(self, data: pd.Series, period: int = None) -> pd.Series:
-        """Relative Strength Index with configurable period"""
+        """Relative Strength Index — Wilder's smoothing (RMA), TradingView-compatible"""
         if period is None:
             period = self.tech_config.rsi_period
             
@@ -35,8 +35,9 @@ class TechnicalIndicators:
         gain = delta.where(delta > 0, 0)
         loss = -delta.where(delta < 0, 0)
         
-        avg_gain = gain.rolling(window=period).mean()
-        avg_loss = loss.rolling(window=period).mean()
+        # Wilder's RMA: ewm(alpha=1/period, adjust=False) — matches TradingView's rma()
+        avg_gain = gain.ewm(alpha=1/period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1/period, adjust=False).mean()
         
         rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
@@ -61,9 +62,9 @@ class TechnicalIndicators:
     
     @staticmethod
     def calculate_bollinger_bands(data: pd.Series, period: int = 20, std_dev: float = 2) -> Dict[str, pd.Series]:
-        """Bollinger Bands"""
+        """Bollinger Bands — TradingView-compatible (population std dev, ddof=0)"""
         sma = TechnicalIndicators.calculate_sma(data, period)
-        std = data.rolling(window=period).std()
+        std = data.rolling(window=period).std(ddof=0)
         
         upper_band = sma + (std * std_dev)
         lower_band = sma - (std * std_dev)
@@ -76,12 +77,13 @@ class TechnicalIndicators:
     
     @staticmethod
     def calculate_stochastic(high: pd.Series, low: pd.Series, close: pd.Series, 
-                           k_period: int = 14, d_period: int = 3) -> Dict[str, pd.Series]:
-        """Stochastic Oscillator"""
+                           k_period: int = 14, d_period: int = 3, smooth_k: int = 3) -> Dict[str, pd.Series]:
+        """Stochastic Oscillator — Slow Stochastic, TradingView-compatible (K=14, D=3, Smooth=3)"""
         lowest_low = low.rolling(window=k_period).min()
         highest_high = high.rolling(window=k_period).max()
         
-        k_percent = 100 * ((close - lowest_low) / (highest_high - lowest_low))
+        raw_k = 100 * ((close - lowest_low) / (highest_high - lowest_low))
+        k_percent = raw_k.rolling(window=smooth_k).mean()  # Slow %K = SMA of raw %K
         d_percent = k_percent.rolling(window=d_period).mean()
         
         return {
@@ -91,13 +93,14 @@ class TechnicalIndicators:
     
     @staticmethod
     def calculate_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
-        """Average True Range"""
+        """Average True Range — Wilder's smoothing (RMA), TradingView-compatible"""
         tr1 = high - low
         tr2 = abs(high - close.shift(1))
         tr3 = abs(low - close.shift(1))
         
         true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        atr = true_range.rolling(window=period).mean()
+        # Wilder's RMA: ewm(alpha=1/period, adjust=False) — matches TradingView default
+        atr = true_range.ewm(alpha=1/period, adjust=False).mean()
         
         return atr
     
@@ -496,8 +499,11 @@ class TechnicalAnalyzer:
             swing_highs = []   # list of (index_in_data, value)
             for i in range(PIVOT_BARS, n - PIVOT_BARS):
                 window = highs[i - PIVOT_BARS : i + PIVOT_BARS + 1]
-                if highs[i] == window.max() and list(window).count(highs[i]) == 1:
-                    swing_highs.append((i, highs[i]))
+                if highs[i] >= window.max():
+                    # Accept pivot if this bar is the first occurrence of the max in the window
+                    first_max_idx = i - PIVOT_BARS + int(np.argmax(window))
+                    if first_max_idx == i:
+                        swing_highs.append((i, highs[i]))
             
             # Also consider the most recent bar as a potential partial pivot
             # if it's the highest of the last PIVOT_BARS bars (for recency)
@@ -511,8 +517,11 @@ class TechnicalAnalyzer:
             swing_lows = []    # list of (index_in_data, value)
             for i in range(PIVOT_BARS, n - PIVOT_BARS):
                 window = lows[i - PIVOT_BARS : i + PIVOT_BARS + 1]
-                if lows[i] == window.min() and list(window).count(lows[i]) == 1:
-                    swing_lows.append((i, lows[i]))
+                if lows[i] <= window.min():
+                    # Accept pivot if this bar is the first occurrence of the min in the window
+                    first_min_idx = i - PIVOT_BARS + int(np.argmin(window))
+                    if first_min_idx == i:
+                        swing_lows.append((i, lows[i]))
             
             # Also consider the most recent bar as a potential partial pivot low
             recent_lows = lows[-PIVOT_BARS:]
@@ -605,13 +614,9 @@ class TechnicalAnalyzer:
                 high_52w_change = ((current_price - high_52w) / high_52w) * 100
                 low_52w_change = ((current_price - low_52w) / low_52w) * 100
                 
-                # Weighted Moving Averages
-                def calculate_wema(data, period):
-                    weights = np.arange(1, period + 1)
-                    return data.rolling(period).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
-                
-                wema_21 = calculate_wema(price_data['close'], 21).iloc[-1]
-                wema_30 = calculate_wema(price_data['close'], 30).iloc[-1]
+                # Weekly Exponential Moving Averages (EMA)
+                wema_21 = price_data['close'].ewm(span=21, adjust=False).mean().iloc[-1]
+                wema_30 = price_data['close'].ewm(span=30, adjust=False).mean().iloc[-1]
                 
                 # Displaced Simple Moving Averages (DSMA)
                 dsma_50 = price_data['close'].rolling(50).mean().shift(10).iloc[-1]  # 10-day displacement
