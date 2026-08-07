@@ -37,6 +37,10 @@ run.sh -> venv activation -> verify_data_freshness.py -> update_portfolio_data.p
      - performance_bar_report.py -> performance_bar_chart_YYYYMMDD.html
      - portfolio_health.py -> portfolio_health_YYYYMMDD.html
      - alert_engine.py -> alert_conditions_YYYYMMDD.html
+     - backtest_engine.py -> signal_backtest_YYYYMMDD.html
+     - sector_analyzer.py -> sector_rotation_YYYYMMDD.html
+     - rebalance_advisor.py -> rebalance_suggestions_YYYYMMDD.html
+     - momentum_rotation.py -> momentum_rotation_YYYYMMDD.html
      - performance_tracker.py -> performance_trend_YYYYMMDD.html
      - report_documentation.py -> reports_documentation_YYYYMMDD.html
   STEP 9: master index (master_report_generator.py -> reports/index.html)
@@ -44,31 +48,36 @@ run.sh -> venv activation -> verify_data_freshness.py -> update_portfolio_data.p
 
 ### Key modules
 
-| Module                       | Purpose                                                                                                        |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `main_pf_app.py`             | Main orchestrator -- 9-step pipeline                                                                           |
-| `technical_indicators.py`    | All technical indicator calculations; builds comprehensive dataset per stock                                   |
-| `html_report_generator.py`   | Main portfolio HTML report with Plotly charts                                                                  |
-| `interactive_filter.py`      | ~55+ filter criteria; generates per-filter HTML reports (MA, RS, volume, 52w, Minervini, HH/HL swing)          |
-| `stock_scorer.py`            | Composite scoring (0-100) across 5 categories: RS, Trend, Momentum (Minervini stage-based), Risk, Value/Volume |
-| `signal_engine.py`           | Strong Buy / Buy / Hold / Sell / Strong Sell signals -- stage-aware (Buy requires Stage 1/2)                   |
-| `minervini_analyzer.py`      | 4-stage classification, 8-point Trend Template, stage analysis report                                          |
-| `pf_optimizer.py`            | Correlation, beta, stress-test, efficient-frontier-style optimization                                          |
-| `pf_drag_analyzer.py`        | Leave-one-out portfolio drag analysis, per-stock drawdown                                                      |
-| `portfolio_health.py`        | Traffic-light health dashboard, HHI concentration, momentum health                                             |
-| `alert_engine.py`            | Critical/Warning/Info alerts: MA crossovers, volume spikes, drawdowns                                          |
-| `performance_tracker.py`     | Persists metrics per run to `performance_history.json`; trend charts                                           |
-| `master_report_generator.py` | Generates `reports/index.html` -- central dashboard with filter count badges                                   |
-| `report_documentation.py`    | Full guide to all reports, indicators, calculations                                                            |
-| `report_style.py`            | Shared dark-theme CSS, sortable-table JS, nav bar, "How It Works" helpers                                      |
-| `config_manager.py`          | Loads/manages `config.json` -- all configurable thresholds and parameters                                      |
-| `data_fetcher.py`            | Yahoo Finance API with smart incremental caching, NSE/BSE fallback, NaN close cleanup                         |
-| `update_portfolio_data.py`   | Standalone script to update portfolio + benchmark data                                                         |
-| `performance_bar_report.py`  | Horizontal period-return bar chart for all stocks (1W/1M/3M/6M/1Y)                                            |
-| `pf_manager.py`              | Loads portfolio from config-driven Excel file, normalizes columns                                              |
-| `data_freshness_checker.py`  | Validates data freshness before analysis                                                                       |
-| `verify_data_freshness.py`   | CLI freshness check used by `run.sh`                                                                           |
-| `smart_data_updater.py`      | Incremental data update logic, used by `data_freshness_checker.py`                                             |
+| Module                       | Purpose                                                                                                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main_pf_app.py`             | Main orchestrator -- 9-step pipeline                                                                                                                            |
+| `technical_indicators.py`    | All technical indicator calculations; builds comprehensive dataset per stock                                                                                    |
+| `html_report_generator.py`   | Main portfolio HTML report with Plotly charts                                                                                                                   |
+| `interactive_filter.py`      | ~55+ filter criteria; generates per-filter HTML reports (MA, RS, volume, 52w, Minervini, HH/HL swing)                                                           |
+| `stock_scorer.py`            | Composite scoring (0-100) across 5 categories: RS, Trend, Momentum (Minervini stage-based), Risk, Value/Volume                                                  |
+| `signal_engine.py`           | Strong Buy / Buy / Hold / Sell / Strong Sell signals -- stage-aware (Buy requires Stage 1/2)                                                                    |
+| `minervini_analyzer.py`      | 4-stage classification, 8-point Trend Template, stage analysis report                                                                                           |
+| `pf_optimizer.py`            | Correlation, beta, stress-test, efficient-frontier-style optimization                                                                                           |
+| `pf_drag_analyzer.py`        | Leave-one-out portfolio drag analysis, per-stock drawdown                                                                                                       |
+| `portfolio_health.py`        | Traffic-light health dashboard, HHI concentration, momentum health                                                                                              |
+| `alert_engine.py`            | Critical/Warning/Info alerts: MA crossovers, volume spikes, drawdowns, RSI 70/30 crossings, golden/death cross, benchmark-relative drawdown, RS momentum fading |
+| `backtest_engine.py`         | Replays event-based entry setups (SMA50/200 reclaim, golden cross, RSI bounce) and reports forward-return win rate / expectancy                                 |
+| `sector_analyzer.py`         | Groups holdings by `config.json` sector_map; sector leaderboard + stage distribution (Unclassified fallback)                                                    |
+| `rebalance_advisor.py`       | Concrete EXIT/TRIM/ADD/HOLD deltas with target allocations; redistributes freed capital to ADD candidates by score                                              |
+| `momentum_rotation.py`       | RRG-style quadrants (Leading/Weakening/Improving/Lagging) from RS + RS_Trend                                                                                    |
+| `data_utils.py`              | Centralized data cleaning helpers: `clean_close_nan()`, `safe_float()`                                                                                          |
+| `performance_tracker.py`     | Persists metrics per run to `performance_history.json`; trend charts                                                                                            |
+| `master_report_generator.py` | Generates `reports/index.html` -- central dashboard with filter count badges                                                                                    |
+| `report_documentation.py`    | Full guide to all reports, indicators, calculations                                                                                                             |
+| `report_style.py`            | Shared dark-theme CSS, sortable-table JS, nav bar, "How It Works" helpers, `render_table()` + `html_escape()`                                                   |
+| `config_manager.py`          | Loads/manages `config.json` -- all configurable thresholds and parameters                                                                                       |
+| `data_fetcher.py`            | Yahoo Finance API with smart incremental caching, NSE/BSE fallback, NaN close cleanup                                                                           |
+| `update_portfolio_data.py`   | Standalone script to update portfolio + benchmark data                                                                                                          |
+| `performance_bar_report.py`  | Horizontal period-return bar chart for all stocks (1W/1M/3M/6M/1Y)                                                                                              |
+| `pf_manager.py`              | Loads portfolio from config-driven Excel file, normalizes columns                                                                                               |
+| `data_freshness_checker.py`  | Validates data freshness before analysis                                                                                                                        |
+| `verify_data_freshness.py`   | CLI freshness check used by `run.sh`                                                                                                                            |
+| `smart_data_updater.py`      | Incremental data update logic, used by `data_freshness_checker.py`                                                                                              |
 
 ### Technical indicators in the comprehensive dataset
 
@@ -77,7 +86,7 @@ run.sh -> venv activation -> verify_data_freshness.py -> update_portfolio_data.p
 - **Note:** WEMA21/WEMA30 are proper EMA (`ewm(span=period, adjust=False)`) on daily close. DSMA50/DSMA200 are displaced (shifted) SMAs kept as reference columns only. Filters and scoring use current SMA50/SMA200 (not displaced).
 - **Minervini:** Stage (1-4), Stage_Name, TT_Score (0-8), Stage_Action, SMA200_Slope
 - **52-week:** 52wH, 52wL, 52wHCh%, 52wLCh%
-- **Momentum:** RSI (14-period Wilder's RMA, reference only -- NOT used in scoring or signals), RS (vs NIFTY 50 benchmark)
+- **Momentum:** RSI (14-period Wilder's RMA, reference only -- NOT used in scoring or signals), RS (vs NIFTY 50 benchmark), RS_Prev (RS ~21 trading days ago), RS_Trend (Rising/Falling/Flat vs 1 month ago), RS_Quadrant (RRG-style: Leading/Weakening/Improving/Lagging)
 - **Risk:** Sharpe Ratio, Sortino Ratio, Standard Deviation
 - **Volume:** OBV, A/D Line, Relative_Volume, Week/Month avg, Volume_Threshold_2x, Week_Threshold_Ratio
 - **Extension:** DMA200_Extension_Pct
@@ -88,14 +97,14 @@ run.sh -> venv activation -> verify_data_freshness.py -> update_portfolio_data.p
 
 All indicators use TradingView-compatible formulas. Any future indicator additions MUST follow these conventions:
 
-| Indicator           | Formula                                                        |
-| ------------------- | -------------------------------------------------------------- |
-| **RSI / ATR**       | Wilder's RMA: `ewm(alpha=1/period, adjust=False).mean()`      |
-| **EMA**             | `ewm(span=period, adjust=False).mean()`                       |
-| **MACD**            | EMA(12) - EMA(26), signal = EMA(9) of MACD line               |
-| **Stochastic**      | Slow 14,3,3: raw %K smoothed by SMA(3), %D = SMA(3) of %K    |
-| **Bollinger Bands** | Population std dev (`ddof=0`)                                  |
-| **SMA**             | `rolling(window=period).mean()`                                |
+| Indicator           | Formula                                                   |
+| ------------------- | --------------------------------------------------------- |
+| **RSI / ATR**       | Wilder's RMA: `ewm(alpha=1/period, adjust=False).mean()`  |
+| **EMA**             | `ewm(span=period, adjust=False).mean()`                   |
+| **MACD**            | EMA(12) - EMA(26), signal = EMA(9) of MACD line           |
+| **Stochastic**      | Slow 14,3,3: raw %K smoothed by SMA(3), %D = SMA(3) of %K |
+| **Bollinger Bands** | Population std dev (`ddof=0`)                             |
+| **SMA**             | `rolling(window=period).mean()`                           |
 
 #### Display label conventions
 
@@ -170,6 +179,7 @@ The primary entry point for all data fetching. Implements a 4-step fallback stra
 ### NaN close price cleanup
 
 NaN close rows (from incomplete market-open fetches) are dropped at every layer:
+
 - `_yahoo_finance_fetch()`: before returning raw data
 - `_combine_historical_data()`: before merging
 - `get_stock_data_smart()`: after loading from cache

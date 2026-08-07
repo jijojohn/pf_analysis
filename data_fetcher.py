@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from typing import Dict, List, Optional, Tuple
 
+from data_utils import clean_close_nan
+
 def _base_symbol(symbol: str) -> str:
     """Strip exchange suffix (.NS/.BO) from symbol for cache filenames.
     E.g., 'RELIANCE.NS' -> 'RELIANCE', 'MODINSU.BO' -> 'MODINSU', 'NIFTY' -> 'NIFTY'"""
@@ -33,8 +35,7 @@ def get_stock_data_smart(symbol: str, force_update: bool = False) -> pd.DataFram
         existing_data = _load_from_cache_with_fallback(symbol)
         if not existing_data.empty:
             # Clean NaN close rows from cached data (incomplete market-open fetches)
-            if 'close' in existing_data.columns:
-                existing_data = existing_data.dropna(subset=['close'])
+            existing_data = clean_close_nan(existing_data)
             
             # Get the date range that needs to be updated
             missing_range = _get_missing_date_range(symbol, existing_data)
@@ -259,10 +260,8 @@ def _combine_historical_data(existing_data: pd.DataFrame, new_data: pd.DataFrame
         new_data['Symbol'] = symbol.split('.')[0]
     
     # Drop rows with NaN close before combining (incomplete/market-open data)
-    if 'close' in existing_data.columns:
-        existing_data = existing_data.dropna(subset=['close'])
-    if 'close' in new_data.columns:
-        new_data = new_data.dropna(subset=['close'])
+    existing_data = clean_close_nan(existing_data)
+    new_data = clean_close_nan(new_data)
     
     # Combine dataframes
     combined_data_list = [existing_data, new_data]
@@ -411,7 +410,7 @@ def _yahoo_finance_fetch(symbol: str, start_date: str, end_date: str, interval: 
         # Drop rows where close price is NaN (incomplete data, e.g. market still open)
         if 'close' in df.columns:
             before_len = len(df)
-            df = df.dropna(subset=['close'])
+            df = clean_close_nan(df)
             dropped = before_len - len(df)
             if dropped > 0:
                 print(f"   🧹 Dropped {dropped} row(s) with NaN close price for {symbol}")
@@ -777,8 +776,7 @@ class DataManager:
         if not isinstance(data.index, pd.DatetimeIndex):
             data.index = pd.to_datetime(data.index)
         # Drop rows where close is NaN (incomplete data from market-open fetches)
-        if 'close' in data.columns:
-            data = data.dropna(subset=['close'])
+        data = clean_close_nan(data)
         return data.sort_index()
     
     def _get_alternative_symbol(self, symbol: str) -> str:

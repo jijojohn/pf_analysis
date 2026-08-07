@@ -594,6 +594,18 @@ class PortfolioApp:
             print("\n🧠 STEP 8b: Generating Analytics Reports")
             try:
                 if hasattr(self, 'comprehensive_dataset') and not self.comprehensive_dataset.empty:
+                    # Load RS benchmark series once (cache-only) for relative analytics
+                    benchmark_series = None
+                    try:
+                        from data_fetcher import get_stock_data_smart
+                        bench_sym = self.technical_analyzer.benchmark_config.rs_benchmark_index
+                        benchmark_series = get_stock_data_smart(bench_sym, force_update=False)
+                        if benchmark_series is not None and benchmark_series.empty:
+                            benchmark_series = None
+                    except Exception as be:
+                        print(f"⚠️  Benchmark series unavailable for analytics: {be}")
+                        benchmark_series = None
+
                     # Portfolio Health Dashboard
                     from portfolio_health import PortfolioHealthDashboard
                     health_dash = PortfolioHealthDashboard(self.comprehensive_dataset)
@@ -601,14 +613,44 @@ class PortfolioApp:
                     if health_path:
                         print(f"✅ Health dashboard: {health_path}")
                     
-                    # Alert Conditions Report
+                    # Alert Conditions Report (now event-aware: crossovers + relative drawdown)
                     from alert_engine import AlertEngine
-                    alert_eng = AlertEngine(self.comprehensive_dataset)
+                    alert_eng = AlertEngine(self.comprehensive_dataset, self.historical_data, benchmark_series)
                     alert_path = alert_eng.generate_report()
                     if alert_path:
                         summary = alert_eng.get_summary()
-                        print(f"✅ Alerts report: {alert_path} ({summary.get('total_alerts', 0)} alerts)")
-                    
+                        print(f"✅ Alerts report: {alert_path} ({summary.get('total', 0)} alerts)")
+
+                    # Signal Backtest (validates the approach with forward-return hit rates)
+                    from backtest_engine import SignalBacktester
+                    backtester = SignalBacktester(self.historical_data)
+                    bt_path = backtester.generate_report()
+                    if bt_path:
+                        print(f"✅ Signal backtest: {bt_path}")
+                    del backtester
+                    gc.collect()
+
+                    # Sector Rotation (config-driven sector map)
+                    from sector_analyzer import SectorAnalyzer
+                    sector = SectorAnalyzer(self.comprehensive_dataset)
+                    sector_path = sector.generate_report()
+                    if sector_path:
+                        print(f"✅ Sector rotation: {sector_path}")
+
+                    # Rebalance Suggestions (actionable trim/add/exit deltas)
+                    from rebalance_advisor import RebalanceAdvisor
+                    advisor = RebalanceAdvisor(self.comprehensive_dataset)
+                    rebal_path = advisor.generate_report()
+                    if rebal_path:
+                        print(f"✅ Rebalance suggestions: {rebal_path}")
+
+                    # Momentum Rotation Map (RRG-style quadrants from RS / RS_Trend)
+                    from momentum_rotation import MomentumRotationAnalyzer
+                    rotation = MomentumRotationAnalyzer(self.comprehensive_dataset)
+                    rotation_path = rotation.generate_report()
+                    if rotation_path:
+                        print(f"✅ Momentum rotation: {rotation_path}")
+
                     # Performance Trend Tracker
                     from performance_tracker import PerformanceTracker
                     tracker = PerformanceTracker(self.comprehensive_dataset)

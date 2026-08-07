@@ -151,11 +151,34 @@
     "strong_sell_threshold": 15
   },
   "alert_settings": {
-    "rsi_overbought": 80,
-    "rsi_oversold": 25,
+    "rsi_overbought": 70,
+    "rsi_oversold": 30,
+    "rsi_severe_overbought": 80,
+    "rsi_severe_oversold": 25,
     "ma_proximity_pct": 2.0,
     "high_drawdown_pct": -30,
-    "volume_spike_threshold": 3.0
+    "drawdown_threshold": -30,
+    "volume_spike_threshold": 3.0,
+    "profit_protect_pct": 20,
+    "relative_underperformance_pct": 10
+  },
+  "backtest_settings": {
+    "horizons": [5, 21, 63],
+    "rsi_period": 14,
+    "rsi_oversold": 30
+  },
+  "sector_settings": {
+    "default_sector": "Unclassified",
+    "sector_map": {}
+  },
+  "rebalance_settings": {
+    "exit_score": 35,
+    "trim_score": 50,
+    "add_score": 65,
+    "overweight_pct": 10.0,
+    "underweight_pct": 4.0,
+    "trim_fraction": 0.3,
+    "max_position_pct": 12.0
   },
   "logging": {
     "level": "INFO",

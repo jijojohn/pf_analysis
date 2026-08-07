@@ -47,7 +47,7 @@ class MasterReportGenerator:
                 continue
             
             # New analytics reports
-            if any(tag in filename for tag in ("portfolio_health", "alert_conditions", "performance_trend", "minervini_stage_analysis", "performance_bar_chart")):
+            if any(tag in filename for tag in ("portfolio_health", "alert_conditions", "performance_trend", "minervini_stage_analysis", "performance_bar_chart", "signal_backtest", "sector_rotation", "rebalance_suggestions", "momentum_rotation")):
                 report_files["analytics_reports"].append(filename)
             elif "filtered_report" in filename:
                 report_files["filtered_reports"].append(filename)
@@ -346,6 +346,22 @@ class MasterReportGenerator:
                     icon = "📊"
                     name = "Performance Bar Chart"
                     desc = " — Horizontal period returns (1W, 1M, 3M, 6M, 1Y) for every stock"
+                elif "signal_backtest" in report:
+                    icon = "🧪"
+                    name = "Signal Backtest & Hit-Rate"
+                    desc = " — Historical win rate, average return & expectancy per entry setup"
+                elif "sector_rotation" in report:
+                    icon = "🔄"
+                    name = "Sector Rotation Analysis"
+                    desc = " — Sector leaderboard by RS and Minervini stage distribution"
+                elif "rebalance_suggestions" in report:
+                    icon = "⚖️"
+                    name = "Rebalance Suggestions"
+                    desc = " — Concrete trim / add / exit deltas with target allocations"
+                elif "momentum_rotation" in report:
+                    icon = "🧭"
+                    name = "Momentum Rotation Map"
+                    desc = " — RRG-style quadrants: leading, weakening, improving, lagging"
                 else:
                     icon = "📊"
                     name = report.replace(f"_{self.today}", "").replace(".html", "").replace("_", " ").title()

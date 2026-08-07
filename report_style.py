@@ -232,3 +232,73 @@ def get_report_footer() -> str:
 </body>
 </html>
 """
+
+
+def html_escape(value) -> str:
+    """Escape a value for safe insertion into HTML (prevents injection/XSS).
+
+    Any value type is accepted and converted to ``str`` first.
+    """
+    import html as _html
+    return _html.escape(str(value), quote=True)
+
+
+def render_table(columns, rows, sortable: bool = True, sort_hint: bool = True) -> str:
+    """Render a sortable, frozen-header HTML table from data.
+
+    Centralizes table generation that was previously duplicated (and
+    inconsistently escaped) across report modules.
+
+    Args:
+        columns: List of header labels (str). Headers are NOT escaped so callers
+            may pass small HTML snippets (e.g. arrows); pass plain text normally.
+        rows: List of rows. Each row is a list of cells. A cell may be:
+            - a scalar (str/number) -> escaped and rendered as text, or
+            - a dict with keys:
+                'text'  : cell content (escaped unless 'html' is True),
+                'class' : optional CSS class for the <td>,
+                'html'  : if True, 'text' is treated as raw HTML (caller-safe),
+                'align' : optional text alignment ('left'/'center'/'right').
+        sortable: If True, headers get the onclick sort handler.
+        sort_hint: If True, prepend a "Click any column header to sort" hint.
+
+    Returns:
+        HTML string containing an optional hint plus a ``.table-wrapper`` table.
+    """
+    # Header
+    th_parts = []
+    for col in columns:
+        onclick = ' onclick="sortTable(this)"' if sortable else ''
+        th_parts.append(f'<th{onclick}>{col}</th>')
+    header_html = '<thead><tr>' + ''.join(th_parts) + '</tr></thead>'
+
+    # Body (build as list then join — avoids string concatenation in loops)
+    body_parts = []
+    for row in rows:
+        cell_parts = []
+        for cell in row:
+            if isinstance(cell, dict):
+                raw = cell.get('text', '')
+                content = str(raw) if cell.get('html') else html_escape(raw)
+                attrs = ''
+                css = cell.get('class')
+                if css:
+                    attrs += f' class="{css}"'
+                align = cell.get('align')
+                if align:
+                    attrs += f' style="text-align:{align}"'
+                cell_parts.append(f'<td{attrs}>{content}</td>')
+            else:
+                cell_parts.append(f'<td>{html_escape(cell)}</td>')
+        body_parts.append('<tr>' + ''.join(cell_parts) + '</tr>')
+    body_html = '<tbody>' + ''.join(body_parts) + '</tbody>'
+
+    hint = '<p class="sort-hint">Click any column header to sort</p>' if (sortable and sort_hint) else ''
+    return f"""{hint}
+<div class="table-wrapper">
+<table>
+{header_html}
+{body_html}
+</table>
+</div>"""
+

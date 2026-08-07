@@ -3,15 +3,23 @@
 Alert Engine Module
 Scans the comprehensive dataset for critical threshold breaches and generates
 an HTML alert report organized by severity (Critical / Warning / Info).
+
+In addition to snapshot (single-day) threshold alerts, the engine can detect
+*crossover* events (price reclaiming the 200-day MA, RSI rolling over from
+overbought, Golden/Death cross) and *benchmark-relative* underperformance when
+historical price series and benchmark data are supplied. These event-based
+alerts are far less noisy than static thresholds because they fire on the
+transition, not the state.
 """
 
 import pandas as pd
 import numpy as np
 import os
 from datetime import datetime, date
-from typing import Dict, List
+from typing import Dict, List, Optional
 from config_manager import get_config
-from report_style import get_base_css, get_sortable_table_js, get_nav_bar, get_how_it_works
+from data_utils import clean_close_nan
+from report_style import get_base_css, get_sortable_table_js, get_nav_bar, get_how_it_works, render_table
 
 
 class AlertEngine:
@@ -21,7 +29,9 @@ class AlertEngine:
     SEVERITY_WARNING = "Warning"
     SEVERITY_INFO = "Info"
 
-    def __init__(self, comprehensive_dataset: pd.DataFrame):
+    def __init__(self, comprehensive_dataset: pd.DataFrame,
+                 historical_data: Optional[pd.DataFrame] = None,
+                 benchmark_data: Optional[pd.DataFrame] = None):
         self.dataset = comprehensive_dataset.copy()
         self.config = get_config()
         self.reports_dir = self.config.get_setting("system_settings.reports_directory", "reports")
@@ -29,10 +39,51 @@ class AlertEngine:
         # Configurable thresholds with sensible defaults
         self.rsi_severe_ob = alert_cfg.get("rsi_severe_overbought", 80)
         self.rsi_severe_os = alert_cfg.get("rsi_severe_oversold", 25)
+        self.rsi_overbought = alert_cfg.get("rsi_overbought", 70)
+        self.rsi_oversold = alert_cfg.get("rsi_oversold", 30)
         self.drawdown_threshold = alert_cfg.get("drawdown_threshold", -30)
         self.volume_spike = alert_cfg.get("volume_spike_threshold", 3.0)
         self.ma_proximity_pct = alert_cfg.get("ma_proximity_pct", 2.0)
         self.profit_protect_pct = alert_cfg.get("profit_protect_pct", 20)
+        # Stock must underperform the benchmark drawdown by at least this many
+        # percentage points (over the trailing window) to flag underperformance.
+        self.rel_underperf_pct = alert_cfg.get("relative_underperformance_pct", 10)
+
+        # Optional time-series inputs for event-based (crossover) alerts
+        self.history = self._index_history(historical_data)
+        self.benchmark = self._prepare_series(benchmark_data)
+
+    # ------------------------------------------------------------------
+    # Time-series preparation
+    # ------------------------------------------------------------------
+    def _prepare_series(self, df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+        """Return a cleaned, date-sorted copy of a single price series."""
+        if df is None or df.empty or 'close' not in df.columns:
+            return None
+        out = df.copy()
+        if 'Date' in out.columns and 'date' not in out.columns:
+            out = out.rename(columns={'Date': 'date'})
+        if 'date' in out.columns:
+            out['date'] = pd.to_datetime(out['date'])
+            out = out.set_index('date')
+        if not isinstance(out.index, pd.DatetimeIndex):
+            try:
+                out.index = pd.to_datetime(out.index)
+            except Exception:
+                return None
+        out = clean_close_nan(out).sort_index()
+        return out if not out.empty else None
+
+    def _index_history(self, historical_data: Optional[pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+        """Split combined historical data into per-symbol cleaned series."""
+        if historical_data is None or historical_data.empty or 'Symbol' not in historical_data.columns:
+            return {}
+        result: Dict[str, pd.DataFrame] = {}
+        for sym, grp in historical_data.groupby('Symbol'):
+            series = self._prepare_series(grp)
+            if series is not None and len(series) >= 2:
+                result[sym] = series
+        return result
 
     # ------------------------------------------------------------------
     # Public API
@@ -45,6 +96,10 @@ class AlertEngine:
 
         for _, row in self.dataset.iterrows():
             alerts.extend(self._check_stock(row))
+            sym = row.get('Symbol', '?')
+            if sym in self.history:
+                alerts.extend(self._check_crossovers(sym, self.history[sym]))
+                alerts.extend(self._check_relative_drawdown(sym, self.history[sym]))
 
         # Sort: Critical first, then Warning, then Info
         severity_order = {self.SEVERITY_CRITICAL: 0, self.SEVERITY_WARNING: 1, self.SEVERITY_INFO: 2}
@@ -87,6 +142,7 @@ class AlertEngine:
         sym = row.get('Symbol', '?')
         rsi = row.get('RSI', 50)
         rs = row.get('RS', 0)
+        rs_trend = row.get('RS_Trend', '')
         cmp = row.get('CMP', 0)
         wema21 = row.get('WEMA21', cmp)
         dsma200 = row.get('SMA200', cmp)  # Use current SMA200, not displaced
@@ -161,7 +217,108 @@ class AlertEngine:
                 f"Profit {pl_pct:.0f}% at risk — RSI {rsi:.0f} declining, below Weekly EMA 21.",
                 f"Stock has >{self.profit_protect_pct}% profit but momentum is fading."))
 
+        # RS deterioration (momentum leadership fading even while in uptrend)
+        if rs_trend == 'Falling' and rs > 0 and stage in (2, 3):
+            alerts.append(self._alert(sym, self.SEVERITY_INFO, "RS Momentum Fading",
+                f"Relative strength is declining ({rs:.1f} now vs higher a month ago).",
+                "RS_Trend = Falling while still outperforming — early leadership-rotation warning."))
+
         return alerts
+
+    # ------------------------------------------------------------------
+    # Event-based (crossover) detection using historical series
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _wilder_rsi(close: pd.Series, period: int = 14) -> pd.Series:
+        delta = close.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
+        rs = avg_gain / avg_loss
+        return 100 - (100 / (1 + rs))
+
+    def _check_crossovers(self, sym: str, series: pd.DataFrame) -> List[Dict]:
+        """Detect transition events between yesterday and today."""
+        alerts: List[Dict] = []
+        close = series['close']
+        if len(close) < 51:
+            return alerts
+
+        sma50 = close.rolling(50).mean()
+        sma200 = close.rolling(200).mean()
+        c_now, c_prev = close.iloc[-1], close.iloc[-2]
+
+        # Price vs SMA200 reclaim / loss
+        if len(close) >= 201 and not pd.isna(sma200.iloc[-2]):
+            s_now, s_prev = sma200.iloc[-1], sma200.iloc[-2]
+            if c_prev < s_prev and c_now >= s_now:
+                alerts.append(self._alert(sym, self.SEVERITY_INFO, "Reclaimed SMA 200",
+                    f"Price crossed back ABOVE the 200-day MA (₹{c_now:.0f} vs ₹{s_now:.0f}).",
+                    "Yesterday's close was below SMA200, today's is above — bullish trend reclaim."))
+            elif c_prev > s_prev and c_now <= s_now:
+                alerts.append(self._alert(sym, self.SEVERITY_WARNING, "Lost SMA 200",
+                    f"Price broke BELOW the 200-day MA (₹{c_now:.0f} vs ₹{s_now:.0f}).",
+                    "Yesterday's close was above SMA200, today's is below — major trend breakdown."))
+
+        # Price vs SMA50 crossover
+        if not pd.isna(sma50.iloc[-2]):
+            s_now, s_prev = sma50.iloc[-1], sma50.iloc[-2]
+            if c_prev < s_prev and c_now >= s_now:
+                alerts.append(self._alert(sym, self.SEVERITY_INFO, "Crossed Above SMA 50",
+                    f"Price crossed ABOVE the 50-day MA (₹{c_now:.0f} vs ₹{s_now:.0f}).",
+                    "Short-term momentum turned positive — price reclaimed SMA50."))
+            elif c_prev > s_prev and c_now <= s_now:
+                alerts.append(self._alert(sym, self.SEVERITY_INFO, "Crossed Below SMA 50",
+                    f"Price crossed BELOW the 50-day MA (₹{c_now:.0f} vs ₹{s_now:.0f}).",
+                    "Short-term momentum turned negative — price lost SMA50."))
+
+        # Golden / Death cross (SMA50 vs SMA200)
+        if len(close) >= 201 and not pd.isna(sma50.iloc[-2]) and not pd.isna(sma200.iloc[-2]):
+            f_now, f_prev = sma50.iloc[-1], sma50.iloc[-2]
+            sl_now, sl_prev = sma200.iloc[-1], sma200.iloc[-2]
+            if f_prev <= sl_prev and f_now > sl_now:
+                alerts.append(self._alert(sym, self.SEVERITY_INFO, "Golden Cross",
+                    "SMA 50 crossed ABOVE SMA 200 — classic long-term bullish signal.",
+                    "50-day MA rose above 200-day MA between the last two sessions."))
+            elif f_prev >= sl_prev and f_now < sl_now:
+                alerts.append(self._alert(sym, self.SEVERITY_WARNING, "Death Cross",
+                    "SMA 50 crossed BELOW SMA 200 — classic long-term bearish signal.",
+                    "50-day MA fell below 200-day MA between the last two sessions."))
+
+        # RSI threshold crossings
+        rsi = self._wilder_rsi(close)
+        if len(rsi) >= 2 and not pd.isna(rsi.iloc[-2]):
+            r_now, r_prev = rsi.iloc[-1], rsi.iloc[-2]
+            if r_prev >= self.rsi_overbought and r_now < self.rsi_overbought:
+                alerts.append(self._alert(sym, self.SEVERITY_WARNING, "RSI Rolled Over",
+                    f"RSI dropped back below {self.rsi_overbought} (now {r_now:.0f}) — overbought unwinding.",
+                    f"RSI crossed down through {self.rsi_overbought}, a momentum-exhaustion trigger."))
+            elif r_prev <= self.rsi_oversold and r_now > self.rsi_oversold:
+                alerts.append(self._alert(sym, self.SEVERITY_INFO, "RSI Bounce",
+                    f"RSI rose back above {self.rsi_oversold} (now {r_now:.0f}) — oversold bounce.",
+                    f"RSI crossed up through {self.rsi_oversold}, a potential reversal trigger."))
+
+        return alerts
+
+    def _check_relative_drawdown(self, sym: str, series: pd.DataFrame) -> List[Dict]:
+        """Compare the stock's trailing drawdown to the benchmark's."""
+        if self.benchmark is None:
+            return []
+        close = series['close']
+        bench = self.benchmark['close']
+        if len(close) < 30 or len(bench) < 30:
+            return []
+
+        window = 252
+        stock_dd = (close.iloc[-1] / close.tail(window).max() - 1) * 100
+        bench_dd = (bench.iloc[-1] / bench.tail(window).max() - 1) * 100
+        gap = stock_dd - bench_dd  # negative means stock is deeper in drawdown
+        if gap <= -self.rel_underperf_pct:
+            return [self._alert(sym, self.SEVERITY_WARNING, "Relative Underperformance",
+                f"Down {stock_dd:.0f}% from its high while benchmark is only {bench_dd:.0f}% — lagging by {abs(gap):.0f}pp.",
+                f"Stock drawdown exceeds benchmark drawdown by more than {self.rel_underperf_pct} percentage points.")]
+        return []
 
     def _alert(self, symbol, severity, alert_type, description, methodology) -> Dict:
         return {
@@ -181,30 +338,43 @@ class AlertEngine:
         w_count = len([a for a in alerts if a['severity'] == self.SEVERITY_WARNING])
         i_count = len([a for a in alerts if a['severity'] == self.SEVERITY_INFO])
 
-        rows_html = ""
+        sev_color = {'Critical': '#f44336', 'Warning': '#FF9800', 'Info': '#2196F3'}
+        sev_icon = {'Critical': '🔴', 'Warning': '🟡', 'Info': '🔵'}
+
+        table_rows = []
         for a in alerts:
-            sc = {'Critical': '#f44336', 'Warning': '#FF9800', 'Info': '#2196F3'}[a['severity']]
-            icon = {'Critical': '🔴', 'Warning': '🟡', 'Info': '🔵'}[a['severity']]
-            rows_html += f"""
-            <tr>
-                <td style="text-align:center">{icon}</td>
-                <td><span style="color:{sc};font-weight:bold">{a['severity']}</span></td>
-                <td><b>{a['symbol']}</b></td>
-                <td>{a['type']}</td>
-                <td>{a['description']}</td>
-                <td style="color:#8b949e;font-size:0.85em">{a['methodology']}</td>
-            </tr>"""
+            sc = sev_color[a['severity']]
+            icon = sev_icon[a['severity']]
+            table_rows.append([
+                {'text': icon, 'align': 'center', 'html': True},
+                {'text': f'<span style="color:{sc};font-weight:bold">{a["severity"]}</span>', 'html': True},
+                {'text': f'<b>{a["symbol"]}</b>', 'html': True},
+                a['type'],
+                a['description'],
+                {'text': a['methodology'], 'class': 'methodology-cell'},
+            ])
+
+        table_html = render_table(
+            ['', 'Severity', 'Symbol', 'Type', 'Description', 'How Detected'],
+            table_rows,
+        )
 
         nav = get_nav_bar('Alert Conditions')
         how_it_works = get_how_it_works('How Alerts Are Generated', [
-            ('RSI Extremes', f'Overbought > {self.rsi_severe_ob}, Oversold < {self.rsi_severe_os} — momentum warning signals'),
+            ('Stage Alerts', 'Minervini Stage 4 = Critical, Stage 3 = Warning, Stage 2 (TT 7+) = Info'),
             ('MA Crossovers', f'Price within {self.ma_proximity_pct}% of Weekly EMA 21 or SMA 200 — potential trend change'),
+            ('Crossover Events', 'Actual transitions between sessions: SMA50/200 reclaim or loss, Golden/Death cross, RSI through 70/30'),
             ('High Drawdown', f'52wHCh% < {self.drawdown_threshold}% — severe decline from 52-week high'),
+            ('Relative Underperformance', f'Stock drawdown exceeds benchmark drawdown by > {self.rel_underperf_pct}pp'),
             ('Volume Spikes', f'Relative volume >= {self.volume_spike}x average — unusual activity detected'),
-            ('Risk Deterioration', 'Both Sharpe & Sortino negative — poor risk-adjusted returns'),
-            ('Contrarian Opportunity', 'Near 52-week low with positive RS — potential reversal candidate'),
+            ('RS Momentum Fading', 'RS_Trend = Falling while still outperforming — leadership rotation warning'),
             ('Profit Protection', f'>{self.profit_protect_pct}% profit with fading momentum — consider booking'),
         ])
+
+        body_table = (
+            "<div class='no-alerts'>✅ No alerts detected — portfolio looks healthy!</div>"
+            if not alerts else table_html
+        )
 
         html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -213,6 +383,7 @@ class AlertEngine:
 <title>Alert Conditions Summary</title>
 <style>{get_base_css()}
   .no-alerts {{ text-align:center; padding:40px; color:#3fb950; font-size:1.3em; }}
+  .methodology-cell {{ color:#8b949e; font-size:0.85em; white-space:normal; }}
 </style>
 <script>{get_sortable_table_js()}</script>
 </head>
@@ -233,14 +404,7 @@ class AlertEngine:
 
 <div class="section">
 <h2>📋 All Alerts</h2>
-{"<div class='no-alerts'>✅ No alerts detected — portfolio looks healthy!</div>" if not alerts else f'''
-<p class="sort-hint">Click any column header to sort</p>
-<div class="table-wrapper">
-<table>
-<thead><tr><th></th><th onclick="sortTable(this)">Severity</th><th onclick="sortTable(this)">Symbol</th><th onclick="sortTable(this)">Type</th><th>Description</th><th>How Detected</th></tr></thead>
-<tbody>{rows_html}</tbody>
-</table>
-</div>'''}
+{body_table}
 </div>
 
 <div class="footer">

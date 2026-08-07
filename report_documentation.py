@@ -478,14 +478,18 @@ class ReportDocumentationGenerator:
             <div class="report-title">🚨 Alert Conditions Report</div>
             <div class="report-purpose">Scans portfolio for critical threshold breaches requiring immediate attention</div>
             
-            <h4>📋 Alert Types (7 categories)</h4>
+            <h4>📋 Alert Types</h4>
             <div class="benefits-list">
                 <ul>
                     <li><strong>Stage 4 — Declining (Critical):</strong> Bearish MA stack, downtrend confirmed. Exit immediately</li>
                     <li><strong>Stage 3 — Topping (Warning):</strong> Distribution phase, MAs converging. Take profits</li>
                     <li><strong>Stage 2 — Prime Uptrend (Info):</strong> Full Trend Template (7+/8). Strong buy setup</li>
-                    <li><strong>MA Crossovers:</strong> CMP within 2% of Weekly EMA 21 or SMA 200</li>
-                    <li><strong>High Drawdown:</strong> 52wHCh% < -30%</li>
+                    <li><strong>MA Crossovers (event-based):</strong> Price reclaiming/losing SMA 50 or SMA 200 between the last two sessions</li>
+                    <li><strong>Golden / Death Cross:</strong> SMA 50 crossing above/below SMA 200</li>
+                    <li><strong>RSI 70 / 30 crossings:</strong> Overbought roll-over or oversold bounce triggers</li>
+                    <li><strong>RS Momentum Fading:</strong> RS still positive but trend turning down in Stage 2/3</li>
+                    <li><strong>Benchmark-Relative Drawdown:</strong> Stock lagging the benchmark drawdown by &gt; 10pp</li>
+                    <li><strong>High Drawdown:</strong> 52wHCh% below the configured threshold</li>
                     <li><strong>Volume Spikes:</strong> Relative Volume ≥ 3x average</li>
                     <li><strong>Risk Deterioration:</strong> Both Sharpe and Sortino negative</li>
                 </ul>
@@ -497,6 +501,78 @@ class ReportDocumentationGenerator:
                 <li><strong>🟡 Warning:</strong> Monitor closely (MA crossovers, risk deterioration)</li>
                 <li><strong>🔵 Info:</strong> Awareness items (contrarian opportunities)</li>
             </ul>
+        </div>
+        
+        <div class="report-card" style="border-left-color:#9c27b0">
+            <div class="report-title">🧪 Signal Backtest &amp; Hit-Rate Report</div>
+            <div class="report-purpose">Validates the <em>approach</em> behind the signals by replaying transparent entry setups across each stock's history and measuring forward returns</div>
+            
+            <h4>📋 Setups Tested (event-based)</h4>
+            <div class="benefits-list">
+                <ul>
+                    <li><strong>SMA50 Reclaim / SMA200 Reclaim:</strong> Price crossing back above the moving average</li>
+                    <li><strong>Golden Cross:</strong> SMA 50 crossing above SMA 200</li>
+                    <li><strong>RSI Oversold Bounce:</strong> RSI crossing back up through the oversold threshold</li>
+                </ul>
+            </div>
+            
+            <h4>📊 Metrics (per setup &amp; holding horizon 5/21/63 days)</h4>
+            <ul>
+                <li><strong>Win Rate:</strong> % of triggers with a positive forward return</li>
+                <li><strong>Avg / Median Return:</strong> typical outcome at each horizon</li>
+                <li><strong>Expectancy:</strong> P(win)×avgWin + P(loss)×avgLoss — positive = an edge</li>
+            </ul>
+            <p><em>Caveat:</em> ignores slippage, costs and survivorship — directional evidence, not a guarantee.</p>
+        </div>
+        
+        <div class="report-card" style="border-left-color:#009688">
+            <div class="report-title">🔄 Sector Rotation Analysis</div>
+            <div class="report-purpose">Groups holdings by sector to surface macro themes that per-stock reports hide</div>
+            
+            <h4>📋 What It Shows</h4>
+            <div class="benefits-list">
+                <ul>
+                    <li><strong>Sector leaderboard</strong> ranked by average Relative Strength</li>
+                    <li><strong>Avg score, P/L and allocation</strong> per sector</li>
+                    <li><strong>Minervini stage distribution</strong> (bullish Stage 1/2 vs bearish Stage 3/4) per sector</li>
+                </ul>
+            </div>
+            <h4>⚙️ Configuration</h4>
+            <p>Sectors come from <code>config.json → sector_settings.sector_map</code> ({"RELIANCE": "Energy", …}). Unmapped symbols fall back to "Unclassified", so the report degrades gracefully when the map is empty.</p>
+        </div>
+        
+        <div class="report-card" style="border-left-color:#ff9800">
+            <div class="report-title">⚖️ Rebalance Suggestions</div>
+            <div class="report-purpose">Turns diagnostics into concrete, transparent rebalancing actions with target allocations</div>
+            
+            <h4>📋 Action Rules (all configurable)</h4>
+            <div class="benefits-list">
+                <ul>
+                    <li><strong>EXIT:</strong> Stage 4, a Sell/Strong Sell signal, or composite score below exit threshold</li>
+                    <li><strong>TRIM:</strong> Stage 3, or an overweight position with a mediocre score</li>
+                    <li><strong>ADD:</strong> Stage 1/2 + Buy/Strong Buy, underweight, with a strong score</li>
+                    <li><strong>HOLD:</strong> everything else</li>
+                </ul>
+            </div>
+            <h4>🔁 Capital Redistribution</h4>
+            <p>Capital freed by exits/trims flows to ADD candidates in proportion to composite score, capped per position. <em>Advisory only</em> — ignores taxes, lot sizes and liquidity.</p>
+        </div>
+        
+        <div class="report-card" style="border-left-color:#3f51b5">
+            <div class="report-title">🧭 Momentum Rotation Map (RRG)</div>
+            <div class="report-purpose">Relative Rotation Graph view — maps each holding into one of four rotation quadrants from RS and its 1-month trend</div>
+            
+            <h4>📋 Quadrants</h4>
+            <div class="benefits-list">
+                <ul>
+                    <li><strong>🟢 Leading (RS &gt; 0, rising/flat):</strong> strongest names — hold / add on pullbacks</li>
+                    <li><strong>🟡 Weakening (RS &gt; 0, falling):</strong> leaders losing steam — tighten stops / trim</li>
+                    <li><strong>🔵 Improving (RS &lt; 0, rising):</strong> early turnarounds — watchlist for entries</li>
+                    <li><strong>🔴 Lagging (RS &lt; 0, falling):</strong> weakest names — avoid / exit</li>
+                </ul>
+            </div>
+            <h4>📊 How to Use</h4>
+            <p>Classic flow is Leading → Weakening → Lagging → Improving → Leading. Watch holdings drifting between quadrants to spot rotation before it shows up in price alone. Backed by the <code>RS_Quadrant</code> column in the comprehensive dataset.</p>
         </div>
         
         <div class="report-card" style="border-left-color:#FF5722">

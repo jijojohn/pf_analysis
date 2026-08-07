@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Optional
 from config_manager import get_config
+from data_utils import clean_close_nan
 
 class TechnicalIndicators:
     """Technical analysis indicators calculation"""
@@ -597,7 +598,7 @@ class TechnicalAnalyzer:
                 
                 # Drop rows where close is NaN (incomplete data from market-open fetches)
                 if 'close' in price_data.columns:
-                    price_data = price_data.dropna(subset=['close'])
+                    price_data = clean_close_nan(price_data)
                     if len(price_data) == 0:
                         print(f"   ⚠️ No valid close prices for {symbol} (all NaN)")
                         continue
@@ -660,6 +661,34 @@ class TechnicalAnalyzer:
                 
                 # Additional indicators
                 rs = self.calculate_relative_strength(price_data, benchmark_data)
+
+                # RS trend: compare current RS vs RS ~21 trading days (1 month) ago
+                # to surface whether relative strength is improving or deteriorating.
+                rs_lookback = 21
+                if len(price_data) > rs_lookback + 5:
+                    prev_price = price_data.iloc[:-rs_lookback]
+                    prev_bench = (benchmark_data.iloc[:-rs_lookback]
+                                  if benchmark_data is not None and len(benchmark_data) > rs_lookback
+                                  else benchmark_data)
+                    rs_prev = self.calculate_relative_strength(prev_price, prev_bench)
+                else:
+                    rs_prev = rs
+                rs_delta = rs - rs_prev
+                if rs_delta > 1.0:
+                    rs_trend = 'Rising'
+                elif rs_delta < -1.0:
+                    rs_trend = 'Falling'
+                else:
+                    rs_trend = 'Flat'
+
+                # Relative Rotation (RRG-style) quadrant: combines leadership
+                # (RS sign) with momentum direction (RS trend) into one of four
+                # actionable rotation states.
+                if rs > 0:
+                    rs_quadrant = 'Weakening' if rs_trend == 'Falling' else 'Leading'
+                else:
+                    rs_quadrant = 'Improving' if rs_trend == 'Rising' else 'Lagging'
+
                 obv = self.calculate_obv(price_data)
                 ad_line = self.calculate_ad_line(price_data)
                 
@@ -700,6 +729,9 @@ class TechnicalAnalyzer:
                     'Sharpe_Ratio': round(sharpe_ratio, 2),
                     'Sortino_Ratio': round(sortino_ratio, 2),
                     'RS': round(rs, 2),
+                    'RS_Prev': round(rs_prev, 2),
+                    'RS_Trend': rs_trend,
+                    'RS_Quadrant': rs_quadrant,
                     'RSI': round(rsi, 2),
                     'OBV': int(obv) if not pd.isna(obv) else 0,
                     'AD': int(ad_line) if not pd.isna(ad_line) else 0,
